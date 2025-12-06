@@ -1,4 +1,3 @@
-import React from "react";
 import { View, StyleSheet, Image, ImageBackground, TouchableOpacity } from "react-native";
 import { Text, Button } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
@@ -19,21 +18,19 @@ export default function WelcomeScreen() {
         <View style={styles.header}>
           <Image
             source={{
-              uri: "https://res.cloudinary.com/dkfykdjlm/image/upload/v1750842738/logobus_vxihzk.png",
+              uri: "https://res.cloudinary.com/dkfykdjlm/image/upload/v1765056163/1765055950791-removebg-preview_wpkvwn.png",
             }}
             style={styles.logo}
             resizeMode="contain"
           />
         </View>
 
+        
         <Text style={styles.heading}>
-          <Text style={styles.bold}>Chuyến đi</Text>
-        </Text>
-        <Text style={styles.heading}>
-          <Text style={styles.bold}>kế tiếp của bạn</Text>
+          <Text style={styles.bold}>Phụng sự bằng trái tim</Text>
         </Text>
         <Text style={styles.subText}>
-          Bất kể bạn muốn đi đến đâu, chúng tôi sẽ giúp bạn tìm ra lộ trình tốt nhất!
+          Bất kể bạn muốn lưu trữ đồ đạt gì, chúng tôi sẽ giúp bạn tìm ra phương pháp tốt nhất!
         </Text>
 
         <Button
@@ -83,20 +80,22 @@ const styles = StyleSheet.create({
   logo: {
     width: 120,
     height: 120,
-    marginRight: 8,
   },
   heading: {
     color: "#fff",
-    fontSize: 27,
-    fontWeight: "600",
+    fontSize: 22,
+    fontWeight: "300",
     marginBottom: 0,
     textAlign: "center",
+    marginLeft:9
   },
   bold: {
     fontWeight: "bold",
+    color: "#fff",
+    
   },
   subText: {
-    color: "black",
+    color: "white",
     fontSize: 14,
     marginBottom: 24,
     textAlign: "center",

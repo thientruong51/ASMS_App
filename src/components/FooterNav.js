@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   labelInactive: { fontSize: 12, color: '#777', marginTop: 4 },
   activeBar: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 8 : 6,
+    bottom: Platform.OS === 'ios' ? 8 : 3,
     height: 4,
     width: 36,
     backgroundColor: '#108a3f',

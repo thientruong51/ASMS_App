@@ -12,7 +12,7 @@ export default function HomeHeader({ logo, brand }) {
         </View>
 
         <TouchableOpacity style={styles.powerWrap}>
-          <Icon name="power" size={24} color="#fff" />
+          <Icon name="truck-fast" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
