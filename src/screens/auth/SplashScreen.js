@@ -1,4 +1,3 @@
-import React from "react";
 import { View, Image, StyleSheet } from "react-native";
 import { Button } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
@@ -16,7 +15,7 @@ export default function SplashScreen() {
       <View style={styles.logoContainer}>
         <Image
           source={{
-            uri: "https://res.cloudinary.com/dkfykdjlm/image/upload/v1762190192/LOGO-remove_1_1_wj05gw.png",
+            uri: "https://res.cloudinary.com/dkfykdjlm/image/upload/v1765056163/1765055950791-removebg-preview_wpkvwn.png",
           }}
           style={styles.logo}
           resizeMode="contain"
