@@ -7,8 +7,7 @@ export default function HomeHeader({ logo, brand }) {
     <View style={styles.header}>
       <View style={styles.headerTop}>
         <View style={styles.brandRow}>
-          <Image source={{ uri: logo }} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.brandText}>{brand}</Text>
+          <Image source={{ uri: 'https://res.cloudinary.com/dkfykdjlm/image/upload/v1762190185/LOGO-remove_1_o1wgk2.png' }} style={styles.logo} resizeMode="contain" />
         </View>
 
         <TouchableOpacity style={styles.powerWrap}>
@@ -30,7 +29,7 @@ const styles = StyleSheet.create({
   },
   headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   brandRow: { flexDirection: "row", alignItems: "center" },
-  logo: { width: 44, height: 44, marginRight: 10, borderRadius: 8 },
+  logo: { width: 104, height: 34, marginRight: 10, borderRadius: 8,  },
   brandText: { color: "#fff", fontWeight: "800", fontSize: 18 },
   powerWrap: { padding: 6 }
 });

@@ -1,4 +1,5 @@
-import  { useEffect, useMemo, useState, useCallback } from 'react';
+// OrderDetailScreen.js
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -16,6 +17,8 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '@env';
 import VerifyEditor from './components/VerifyEditor';
+import PhotoUploader from './components/PhotoUploaderExpo';
+import PaymentWebView from './components/PaymentWebView';
 
 const STEPS = [
   { key: 'pending', icon: 'file-document-outline', label: 'Chờ' },
@@ -23,6 +26,7 @@ const STEPS = [
   { key: 'verify', icon: 'shield-check-outline', label: 'Kiểm tra' },
   { key: 'checkout', icon: 'credit-card-check', label: 'Tính tiền' },
   { key: 'pick up', icon: 'truck-fast', label: 'Đã lấy' },
+  { key: 'delivered', icon: 'truck-check', label: 'Đã giao' },
 ];
 
 const normalizeKey = (s) => {
@@ -60,6 +64,9 @@ function mapStatusToVN(s) {
     case 'pick up':
     case 'pickup':
       return 'Đã lấy hàng';
+    case 'delivered':
+    case 'deliver':
+      return 'Đã giao';
     default:
       return s ?? '-';
   }
@@ -99,6 +106,7 @@ function OrderBadge({ text, color = '#108a3f' }) {
   );
 }
 
+/* ---------- translation maps & helpers (unchanged) ---------- */
 const SERVICE_TRANSLATIONS = {
   'From shipping to warehouse': 'Vận chuyển đến kho',
   Protecting: 'Bảo hiểm',
@@ -141,7 +149,7 @@ const PRODUCTTYPE_TRANSLATIONS = {
   'Box/Bag': 'Thùng/Vali',
 };
 
-const CONTAINER_TYPE_PREFIX = 'Thùng'; 
+const CONTAINER_TYPE_PREFIX = 'Thùng';
 
 function translateServiceName(en) {
   if (!en) return null;
@@ -186,13 +194,14 @@ function translateContainerType(item) {
     if (parts.length === 1) return `${CONTAINER_TYPE_PREFIX} ${parts[0]}`;
     const remainder = parts.slice(1).join(' ');
     const remTranslated = remainder
-      .replace(/Storage/i, 'Storage') 
+      .replace(/Storage/i, 'Storage')
       .replace(/AC/i, 'AC');
     return `${CONTAINER_TYPE_PREFIX} ${parts[0]} ${remTranslated}`;
   }
   if (item.name && String(item.name).trim() !== '') return item.name;
   return null;
 }
+/* ---------- end helpers ---------- */
 
 function DetailItem({ it, lookups }) {
   const {
@@ -238,12 +247,11 @@ function DetailItem({ it, lookups }) {
     const raw = full?.displayName ?? serviceMap?.[it.serviceId] ?? it.serviceName;
     serviceNames = [translateServiceName(raw)];
   }
-const containerObj = it?.containerTypeId ? containerFull?.[it.containerTypeId] : null;
+  const containerObj = it?.containerTypeId ? containerFull?.[it.containerTypeId] : null;
 
-
-const containerName = containerObj
-  ? String(containerObj.type ?? containerObj.name ?? containerMap?.[it.containerTypeId] ?? '')
-  : (
+  const containerName = containerObj
+    ? String(containerObj.type ?? containerObj.name ?? containerMap?.[it.containerTypeId] ?? '')
+    : (
       (it?.containerType !== undefined && (typeof it.containerType === 'number' || /^\d+$/.test(String(it.containerType))))
         ? (containerMap?.[Number(it.containerType)] ?? String(it.containerType))
         : (it?.containerType ?? null)
@@ -276,62 +284,46 @@ const containerName = containerObj
       <Card.Content style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
         <Image source={{ uri: it?.image }} style={ui.itemImage} resizeMode="cover" />
         <View style={{ flex: 1 }}>
-          {/* Product name */}
           <Text style={ui.itemTitle}>{productDisplayName}</Text>
 
-          {/* Product type(s) */}
           {showProductType && (
             <Text style={{ color: '#666', marginTop: 6 }}>Loại: {productTypeNames.join(', ')}</Text>
           )}
 
-          {/* Services */}
           {showServices && (
             <View style={{ flexDirection: 'row', marginTop: 8, flexWrap: 'wrap' }}>
               {serviceNames.map((s, idx) => <Chip key={idx} style={ui.serviceChip} compact>{s}</Chip>)}
             </View>
           )}
 
-          {/* Quantity & subtotal */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: (showProductType || showServices) ? 12 : 8 }}>
             <Text style={ui.itemMeta}>Số lượng: <Text style={{ fontWeight: '800' }}>{it?.quantity ?? '-'}</Text></Text>
             <Text style={ui.itemPrice}>{formatMoney(it?.subTotal ?? 0)}</Text>
           </View>
 
-          {/* Container (show only if present) */}
           {showContainer && (
             <View style={{ marginTop: 8 }}>
               <Text style={{ color: '#444', fontWeight: '700' }}>Thùng</Text>
-              <Text style={{ color: '#777', marginTop: 4 }}>
-                Loại: {containerName}
-                </Text>
-                 <Text style={{ color: '#777', marginTop: 4 }}>{containerObj ? `Kích thước: ${fmtNum(containerObj.length)} x ${fmtNum(containerObj.width)} x ${fmtNum(containerObj.height)} m` : ''}
-              </Text>
+              <Text style={{ color: '#777', marginTop: 4 }}>Loại: {containerName}</Text>
+              <Text style={{ color: '#777', marginTop: 4 }}>{containerObj ? `Kích thước: ${fmtNum(containerObj.length)} x ${fmtNum(containerObj.width)} x ${fmtNum(containerObj.height)} m` : ''}</Text>
               {containerObj?.price ? <Text style={{ color: '#777', marginTop: 4 }}>Giá thùng: {formatMoney(containerObj.price)}</Text> : null}
             </View>
           )}
 
-          {/* Storage (show only if present) */}
           {showStorage && (
             <View style={{ marginTop: 8 }}>
               <Text style={{ color: '#444', fontWeight: '700' }}>Kho</Text>
-              <Text style={{ color: '#777', marginTop: 4 }}>
-                Loại: {storageName}
-              </Text>
-              <Text style={{ color: '#777', marginTop: 4 }}>{storageObj?`Kích thước: ${fmtNum(storageObj.length)} x ${fmtNum(storageObj.width)} x ${fmtNum(storageObj.height)} m` : ''}</Text>  
-
+              <Text style={{ color: '#777', marginTop: 4 }}>Loại: {storageName}</Text>
+              <Text style={{ color: '#777', marginTop: 4 }}>{storageObj ? `Kích thước: ${fmtNum(storageObj.length)} x ${fmtNum(storageObj.width)} x ${fmtNum(storageObj.height)} m` : ''}</Text>
               {storageObj?.area ? <Text style={{ color: '#777', marginTop: 4 }}>Diện tích: {fmtNum(storageObj.area)} m² • Thể tích: {fmtNum(storageObj.totalVolume)} m³</Text> : null}
             </View>
           )}
 
-          {/* Shelf (show only if present) */}
           {showShelf && (
             <View style={{ marginTop: 8, marginBottom: 6 }}>
               <Text style={{ color: '#444', fontWeight: '700' }}>Kệ</Text>
-              <Text style={{ color: '#777', marginTop: 4 }}>
-                Loại: {shelfName}
-              </Text>
-               <Text style={{ color: '#777', marginTop: 4 }}>{shelfObj?.length || shelfObj?.width || shelfObj?.height ?`Kích thước: ${fmtNum(shelfObj.length)} x ${fmtNum(shelfObj.width)} x ${fmtNum(shelfObj.height)} m` : ''}</Text>  
-
+              <Text style={{ color: '#777', marginTop: 4 }}>Loại: {shelfName}</Text>
+              <Text style={{ color: '#777', marginTop: 4 }}>{shelfObj?.length || shelfObj?.width || shelfObj?.height ? `Kích thước: ${fmtNum(shelfObj.length)} x ${fmtNum(shelfObj.width)} x ${fmtNum(shelfObj.height)} m` : ''}</Text>
             </View>
           )}
         </View>
@@ -597,6 +589,121 @@ export default function OrderDetailScreen({ route, navigation }) {
   const totalFromDetails = details.reduce((acc, it) => acc + Number(it.subTotal ?? 0), 0);
   const totalPrice = order?.totalPrice && Number(order.totalPrice) > 0 ? Number(order.totalPrice) : totalFromDetails;
 
+  /* ---------- NEW: queue-safe image appender ---------- */
+  const uploadQueueRef = useRef({ queue: [], running: false });
+
+  const processUploadQueue = useCallback(async () => {
+    const q = uploadQueueRef.current;
+    if (q.running) return;
+    q.running = true;
+
+    while (q.queue.length > 0) {
+      const job = q.queue.shift();
+      const { orderCode, imageUrl, resolve, reject } = job;
+      try {
+        // optimistic update (merge into local state)
+        setOrder(prev => {
+          const cur = prev || {};
+          const curImgs = Array.isArray(cur.image) ? cur.image : Array.isArray(cur.images) ? cur.images : [];
+          if (curImgs.includes(imageUrl)) return prev;
+          return { ...cur, image: [...curImgs, imageUrl] };
+        });
+
+        // fetch server order to get current images (best effort)
+        const token = await AsyncStorage.getItem('@auth_token');
+        let serverOrder = null;
+        try {
+          const getUrl = `${apiBase}/api/Order/${encodeURIComponent(orderCode)}`;
+          const getRes = await fetch(getUrl, {
+            method: 'GET',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          });
+          const getJson = await getRes.json().catch(() => null);
+          const payload = getJson?.data ?? getJson ?? null;
+          serverOrder = Array.isArray(payload) ? payload[0] : payload;
+        } catch (e) {
+          console.warn('Could not fetch server order before merging images', e);
+        }
+
+        const existingFromServer =
+          (serverOrder && Array.isArray(serverOrder.image) && serverOrder.image) ||
+          (serverOrder && Array.isArray(serverOrder.images) && serverOrder.images) ||
+          (serverOrder && Array.isArray(serverOrder.photos) && serverOrder.photos) ||
+          [];
+
+        const existingLocal = Array.isArray(order?.image) ? order.image : Array.isArray(order?.images) ? order.images : [];
+        const combined = Array.from(new Set([...(existingFromServer || []), ...(existingLocal || []), imageUrl]));
+
+        // Try PUT with common field names; break on first success
+        const putUrl = `${apiBase}/api/Order/${encodeURIComponent(orderCode)}`;
+        const putBodies = [
+          { image: combined },
+          { images: combined },
+          { photos: combined }
+        ];
+
+        let putSuccess = false;
+        let updatedOrder = null;
+        for (const body of putBodies) {
+          try {
+            const putRes = await fetch(putUrl, {
+              method: 'PUT',
+              headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+              body: JSON.stringify(body),
+            });
+            const putJson = await putRes.json().catch(() => null);
+            if (!putRes.ok) {
+              console.warn('PUT attempt failed', putRes.status, putJson);
+              continue;
+            }
+            putSuccess = true;
+            const ret = putJson?.data ?? putJson ?? null;
+            updatedOrder = Array.isArray(ret) ? ret[0] : ret;
+            break;
+          } catch (e) {
+            console.warn('PUT attempt error', e);
+            continue;
+          }
+        }
+
+        if (!putSuccess) {
+          console.warn('All PUT attempts failed; image may not be persisted on server');
+          Alert.alert('Cập nhật ảnh thất bại', 'Không thể lưu ảnh lên server. Vui lòng thử lại.');
+        } else {
+          if (updatedOrder) {
+            setOrder(prev => ({ ...prev, ...(updatedOrder || {}) }));
+          } else {
+            // if server accepted but didn't return object, keep local merged
+            setOrder(prev => {
+              const cur = prev || {};
+              const curImgs = Array.isArray(cur.image) ? cur.image : Array.isArray(cur.images) ? cur.images : [];
+              const merged = Array.from(new Set([...(curImgs || []), imageUrl]));
+              return { ...cur, image: merged };
+            });
+          }
+        }
+
+        resolve && resolve(true);
+      } catch (err) {
+        console.error('processUploadQueue job error', err);
+        reject && reject(err);
+      }
+    } // end while
+
+    q.running = false;
+  }, [apiBase, order]);
+
+  const queueUpdateOrderWithImage = useCallback((orderCode, imageUrl) => {
+    return new Promise((resolve, reject) => {
+      uploadQueueRef.current.queue.push({ orderCode, imageUrl, resolve, reject });
+      processUploadQueue().catch(e => {
+        console.warn('processUploadQueue top error', e);
+      });
+    });
+  }, [processUploadQueue]);
+
+  /* ---------- end queue logic ---------- */
+
   const goToNextStep = async () => {
     if (busy) return;
 
@@ -685,7 +792,7 @@ export default function OrderDetailScreen({ route, navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 140 }}>
-        {/* STEPPER (single-row flexible: items share space and shrink) */}
+        {/* STEPPER */}
         <Surface style={ui.stepCard}>
           <View style={ui.stepHeaderRow}>
             <Text style={{ fontWeight: '800' }}>Quy trình</Text>
@@ -719,7 +826,6 @@ export default function OrderDetailScreen({ route, navigation }) {
                       </Text>
                     </View>
 
-                    {/* connector between steps (not rendered for last) */}
                     {i < STEPS.length - 1 && (
                       <View style={ui.connectorContainer}>
                         <View style={[
@@ -762,13 +868,73 @@ export default function OrderDetailScreen({ route, navigation }) {
               <SummaryRow label="Ngày đặt" value={formatDate(order?.orderDate ?? order?.depositDate)} />
 
               <View style={{ height: 8 }} />
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Button mode="contained" onPress={() => Alert.alert('Hành động', 'Bắt đầu giao hàng / thao tác khác')}>Thao tác</Button>
-                <Button mode="outlined" onPress={() => Alert.alert('Export', 'Xuất hóa đơn / in')}>Xuất</Button>
-              </View>
+              
+              {normalizeKey(order?.status) === 'checkout' && (
+          <PaymentWebView
+            orderCode={order?.orderCode ?? routeOrderCode}
+            apiBase={apiBase}
+            onPaid={async () => {
+              const code = order?.orderCode ?? routeOrderCode;
+              if (!code) return;
+              const fresh = await fetchOrderSummary(code);
+              if (fresh) setOrder(prev => ({ ...prev, ...(Array.isArray(fresh) ? fresh[0] : fresh) }));
+              const freshDet = await fetchOrderDetails(code);
+              setDetails(freshDet);
+              Alert.alert('Cập nhật', 'Đã làm mới thông tin đơn hàng sau khi thanh toán.');
+            }}
+            onClose={async () => {
+              const code = order?.orderCode ?? routeOrderCode;
+              if (!code) return;
+              try {
+                const fresh = await fetchOrderSummary(code);
+                if (fresh) setOrder(prev => ({ ...prev, ...(Array.isArray(fresh) ? fresh[0] : fresh) }));
+                const freshDet = await fetchOrderDetails(code);
+                setDetails(freshDet);
+              } catch (e) {
+                console.warn('refresh onClose failed', e);
+              }
+            }}
+          />
+
+        )}
             </View>
           </View>
+          
         </Surface>
+
+       
+        {/* --- PHOTO UPLOADER (only when pick up OR delivered) --- */}
+        {['pick up', 'pickup', 'delivered', 'deliver'].includes(normalizeKey(order?.status)) && (
+          <Surface style={{ marginBottom: 12, padding: 12, borderRadius: 12, backgroundColor: '#fff' }}>
+            <Text style={{ fontWeight: '800', marginBottom: 8 }}>Ảnh xác nhận</Text>
+            <PhotoUploader
+              onUploaded={(url) => {
+                // push to queue so uploads are serialized and images are appended
+                queueUpdateOrderWithImage(order?.orderCode ?? routeOrderCode, url)
+                  .then(() => console.log('queued update done'))
+                  .catch(e => {
+                    console.warn('queued update failed', e);
+                    Alert.alert('Lỗi', 'Không thể cập nhật ảnh lên order.');
+                  });
+              }}
+              onError={(e) => {
+                console.warn('upload error', e);
+                Alert.alert('Lỗi upload', String(e));
+              }}
+            />
+            <Text style={{ color: '#666', marginTop: 8, fontSize: 12 }}>
+              Chụp ảnh chứng từ/giao nhận và nhấn Upload. Ảnh sẽ được lưu vào đơn hàng.
+            </Text>
+            {/* show previews from order.image if any */}
+            {Array.isArray(order?.image) && order.image.length > 0 && (
+              <View style={{ flexDirection: 'row', marginTop: 8, gap: 8 }}>
+                {order.image.map((u, idx) => (
+                  <Image key={idx} source={{ uri: u }} style={{ width: 80, height: 80, borderRadius: 6 }} />
+                ))}
+              </View>
+            )}
+          </Surface>
+        )}
 
         {/* DETAILS CARD */}
         <Surface style={ui.summaryCard}>
@@ -777,7 +943,6 @@ export default function OrderDetailScreen({ route, navigation }) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={{ color: '#666' }}>{details.length} mục</Text>
 
-              {/* Edit toggle button (only when status is verify) */}
               {normalizeKey(order?.status) === 'verify' ? (
                 <Button
                   mode={showVerifyEditor ? 'contained' : 'outlined'}
@@ -804,7 +969,7 @@ export default function OrderDetailScreen({ route, navigation }) {
           )}
         </Surface>
 
-        {/* VerifyEditor is toggleable */}
+        {/* VerifyEditor */}
         {normalizeKey(order?.status) === 'verify' && showVerifyEditor && (
           <VerifyEditor
             orderCode={order?.orderCode ?? order?.id}

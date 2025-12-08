@@ -36,11 +36,14 @@ export default function ContainerCard({ item = {}, onInfo, onConfig, onPress }) 
   const statusColor = (s) => {
     if (!s) return "#777";
     const st = String(s).toLowerCase();
+
     if (st.includes("paid")) return "#1AA64B";
     if (st.includes("pending")) return "#f39c12";
     if (st.includes("unpaid") || st.includes("un-paid")) return "#e74c3c";
     if (st.includes("inorder") || st.includes("active") || st.includes("verify") || st.includes("checkout")) return "#108a3f";
     if (st.includes("pick") || st.includes("pick up") || st.includes("wait pick up")) return "#0a8bd6";
+    // delivered (màu khác để dễ nhận biết) — nhận cả "delivered" hoặc các biến thể chứa "deliver"
+    if (st.includes("deliver") || st.includes("delivered")) return "#2D9CDB";
     return "#777";
   };
 
@@ -76,6 +79,9 @@ export default function ContainerCard({ item = {}, onInfo, onConfig, onPress }) 
     if (st.includes("unpaid") || st.includes("un-paid")) return "Chưa thanh toán";
     if (st.includes("inorder")) return "Trong đơn";
     if (st.includes("active")) return "Hoạt động";
+
+    // delivered
+    if (st.includes("deliver") || st.includes("delivered")) return "Đã giao";
 
     return s;
   };
