@@ -185,7 +185,7 @@ export default function LoginScreen() {
           <Text style={styles.subtitle}>Đăng nhập để tiếp tục</Text>
 
           <TextInput
-            label="Email"
+            label="Tài khoản"
             value={formData.email}
             onChangeText={(t) => handleChange("email", t)}
             mode="outlined"

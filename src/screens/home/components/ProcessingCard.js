@@ -41,6 +41,8 @@ export default function ProcessingCard({ item = {}, onStart, onInfo, onConfig, o
     if (st.includes("unpaid") || st.includes("un-paid")) return "#e74c3c";
     if (st.includes("inorder") || st.includes("active") || st.includes("verify") || st.includes("checkout")) return "#108a3f";
     if (st.includes("pick") || st.includes("pick up") || st.includes("wait pick up")) return "#0a8bd6";
+    // delivered: nhận cả "deliver" và "delivered"
+    if (st.includes("deliver") || st.includes("delivered")) return "#2D9CDB";
     return "#777";
   };
 
@@ -76,6 +78,9 @@ export default function ProcessingCard({ item = {}, onStart, onInfo, onConfig, o
     if (st.includes("unpaid") || st.includes("un-paid")) return "Chưa thanh toán";
     if (st.includes("inorder")) return "Trong đơn";
     if (st.includes("active")) return "Hoạt động";
+
+    // delivered
+    if (st.includes("deliver") || st.includes("delivered")) return "Đã giao";
 
     return s;
   };

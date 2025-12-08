@@ -37,7 +37,7 @@ export default function HomeScreen({ navigation }) {
 
   const MAX_SECTION_HEIGHT = 420;
 
-  const ALLOWED_STATUSES_RAW = ['pending', 'wait pick up', 'verify', 'checkout', 'pick up'];
+  const ALLOWED_STATUSES_RAW = ['pending', 'wait pick up', 'verify', 'checkout', 'pick up', 'delivered'];
   const normalizeStatus = (raw) => (raw === null || raw === undefined ? '' : String(raw).toLowerCase().replace(/\s+/g, ' ').trim());
 
   const {
@@ -64,7 +64,10 @@ export default function HomeScreen({ navigation }) {
         stats_chogiao.add(n); stats_chogiao.add(n.replace(/\s+/g, ''));
       } else if (n === 'pick up') {
         processing.add(n); processing.add(n.replace(/\s+/g, ''));
+        stats_danggiao.add(n); stats_danggiao.add(n.replace(/\s+/g, ''));
+      } else if (n === 'delivered') {
         stats_dagiao.add(n); stats_dagiao.add(n.replace(/\s+/g, ''));
+        processing.add(n); processing.add(n.replace(/\s+/g, ''));
       } else {
         processing.add(n); processing.add(n.replace(/\s+/g, ''));
         stats_danggiao.add(n); stats_danggiao.add(n.replace(/\s+/g, ''));
