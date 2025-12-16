@@ -1,4 +1,4 @@
-import  { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Alert,
@@ -297,32 +297,32 @@ export default function VerifyEditor({
   };
 
   const onRemoveItem = (idx) => {
-  const item = localDetails[idx];
-  Alert.alert("Xác nhận", "Bạn có chắc muốn xóa mục này?", [
-    { text: "Hủy", style: "cancel" },
-    {
-      text: "Xóa",
-      style: "destructive",
-      onPress: () => {
-        const id = Number(item?.orderDetailId ?? 0);
-        const existsInInitial = !!(initialDetailsRef.current || []).find((d) => Number(d.orderDetailId) === id && id > 0);
-        if (id > 0 && existsInInitial) {
-          setLocalDetails((prev) => {
-            const arr = prev.slice();
-            const cur = { ...(arr[idx] || {}) };
-            cur.quantity = 0;
-            cur.containerQuantity = 0;
-            cur.subTotal = computeSubTotal(cur);
-            arr[idx] = cur;
-            return arr;
-          });
-        } else {
-          setLocalDetails((p) => p.filter((_, i) => i !== idx));
-        }
+    const item = localDetails[idx];
+    Alert.alert("Xác nhận", "Bạn có chắc muốn xóa mục này?", [
+      { text: "Hủy", style: "cancel" },
+      {
+        text: "Xóa",
+        style: "destructive",
+        onPress: () => {
+          const id = Number(item?.orderDetailId ?? 0);
+          const existsInInitial = !!(initialDetailsRef.current || []).find((d) => Number(d.orderDetailId) === id && id > 0);
+          if (id > 0 && existsInInitial) {
+            setLocalDetails((prev) => {
+              const arr = prev.slice();
+              const cur = { ...(arr[idx] || {}) };
+              cur.quantity = 0;
+              cur.containerQuantity = 0;
+              cur.subTotal = computeSubTotal(cur);
+              arr[idx] = cur;
+              return arr;
+            });
+          } else {
+            setLocalDetails((p) => p.filter((_, i) => i !== idx));
+          }
+        },
       },
-    },
-  ]);
-};
+    ]);
+  };
 
 
   const openSelector = (type, detailIndex) => setSelector({ visible: true, type, detailIndex });
@@ -418,45 +418,45 @@ export default function VerifyEditor({
   };
 
   const buildPayload = () => {
-  const { final, delta } = computeFinalTotal();
+    const { final, delta } = computeFinalTotal();
 
-  const prevUnpaid = Number(localOrderMeta.unpaidAmount ?? initialOrder.unpaidAmount ?? 0) || 0;
-  const newUnpaid = Math.max(0, Math.round(prevUnpaid + delta));
+    const prevUnpaid = Number(localOrderMeta.unpaidAmount ?? initialOrder.unpaidAmount ?? 0) || 0;
+    const newUnpaid = Math.max(0, Math.round(prevUnpaid + delta));
 
-  return {
-    depositDate: localOrderMeta.depositDate || null,
-    returnDate: localOrderMeta.returnDate || null,
-    status: localOrderMeta.status || "verify",
-    paymentStatus: localOrderMeta.paymentStatus ?? null,
-    totalPrice: final,
-    unpaidAmount: newUnpaid,
-    customerName: localOrderMeta.customerName ?? "",
-    phoneContact: localOrderMeta.phoneContact ?? "",
-    email: localOrderMeta.email ?? "",
-    note: localOrderMeta.note ?? "",
-    image: localOrderMeta.image ?? null,
-    address: localOrderMeta.address ?? "",
-    style: localOrderMeta.style ?? "",
-    storageTypeId: localOrderMeta.storageTypeId ?? 0,
-    shelfTypeId: localOrderMeta.shelfTypeId ?? 0,
-    shelfQuantity: localOrderMeta.shelfQuantity ?? 0,
-    orderDetails: localDetails.map((d) => ({
-      orderDetailId: Number(d.orderDetailId ?? 0),
-      storageCode: d.storageCode ?? null,
-      containerCode: d.containerCode ?? "",
-      price: Number(d.price ?? 0),
-      quantity: String(d.quantity ?? "0"),
-      storageTypeId: d.storageTypeId ?? null,
-      shelfTypeId: d.shelfTypeId ?? null,
-      shelfQuantity: d.shelfQuantity ?? null,
-      image: d.image ?? null,
-      containerType: Number(d.containerType ?? 0),
-      containerQuantity: Number(d.containerQuantity ?? 0),
-      productTypeIds: Array.isArray(d.productTypeIds) ? d.productTypeIds.map(Number) : [],
-      serviceIds: Array.isArray(d.serviceIds) ? d.serviceIds.map(Number) : [],
-    })),
+    return {
+      depositDate: localOrderMeta.depositDate || null,
+      returnDate: localOrderMeta.returnDate || null,
+      status: localOrderMeta.status || "verify",
+      paymentStatus: localOrderMeta.paymentStatus ?? null,
+      totalPrice: final,
+      unpaidAmount: newUnpaid,
+      customerName: localOrderMeta.customerName ?? "",
+      phoneContact: localOrderMeta.phoneContact ?? "",
+      email: localOrderMeta.email ?? "",
+      note: localOrderMeta.note ?? "",
+      image: localOrderMeta.image ?? null,
+      address: localOrderMeta.address ?? "",
+      style: localOrderMeta.style ?? "",
+      storageTypeId: localOrderMeta.storageTypeId ?? 0,
+      shelfTypeId: localOrderMeta.shelfTypeId ?? 0,
+      shelfQuantity: localOrderMeta.shelfQuantity ?? 0,
+      orderDetails: localDetails.map((d) => ({
+        orderDetailId: Number(d.orderDetailId ?? 0),
+        storageCode: d.storageCode ?? null,
+        containerCode: d.containerCode ?? "",
+        price: Number(d.price ?? 0),
+        quantity: String(d.quantity ?? "0"),
+        storageTypeId: d.storageTypeId ?? null,
+        shelfTypeId: d.shelfTypeId ?? null,
+        shelfQuantity: d.shelfQuantity ?? null,
+        image: d.image ?? null,
+        containerType: Number(d.containerType ?? 0),
+        containerQuantity: Number(d.containerQuantity ?? 0),
+        productTypeIds: Array.isArray(d.productTypeIds) ? d.productTypeIds.map(Number) : [],
+        serviceIds: Array.isArray(d.serviceIds) ? d.serviceIds.map(Number) : [],
+      })),
+    };
   };
-};
 
 
   const onSubmit = async () => {
@@ -614,19 +614,61 @@ export default function VerifyEditor({
         })}
       </View>
 
-      <View style={styles.footerRow}>
-        <View>
-          <Text>Tổng đơn hàng ban đầu: {(Number(originalOrderTotal) || 0).toLocaleString()} đ</Text>
-          <Text>Tổng chi tiết hiện tại: {currentDetailsTotal.toLocaleString()} đ</Text>
-          <Text>Trên lệch: {delta >= 0 ? "+" : ""}{delta.toLocaleString()} đ</Text>
-          <Text style={{ fontWeight: "900", marginTop: 6 }}>Final total: {finalTotal.toLocaleString()} đ</Text>
-        </View>
+      <Card style={styles.summaryCard}>
+        <Card.Content>
+          {/* ROWS */}
+          <View style={styles.summaryRow}>
+            <Text style={styles.label}>Tổng đơn ban đầu</Text>
+            <Text style={styles.value}>
+              {(Number(originalOrderTotal) || 0).toLocaleString()} đ
+            </Text>
+          </View>
 
-        <View style={{ flexDirection: "row" }}>
-          <Button mode="outlined" onPress={onAddItem} style={{ marginRight: 8 }}>Thêm mục</Button>
-          <Button mode="contained" loading={saving} onPress={onSubmit}>Lưu</Button>
-        </View>
-      </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.label}>Tổng chi tiết hiện tại</Text>
+            <Text style={styles.value}>
+              {currentDetailsTotal.toLocaleString()} đ
+            </Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <Text style={styles.label}>Chênh lệch</Text>
+            <Text
+              style={[
+                styles.value,
+                { color: delta >= 0 ? "#d32f2f" : "#2e7d32" },
+              ]}
+            >
+              {delta >= 0 ? "+" : ""}
+              {delta.toLocaleString()} đ
+            </Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* FINAL */}
+          <View style={styles.finalRow}>
+            <Text style={styles.finalLabel}>Tổng kết giá</Text>
+            <Text style={styles.finalValue}>
+              {finalTotal.toLocaleString()} đ
+            </Text>
+          </View>
+        </Card.Content>
+
+        <Card.Actions style={styles.actions}>
+          <Button mode="outlined" onPress={onAddItem}>
+            Thêm mục
+          </Button>
+          <Button
+            mode="contained"
+            loading={saving}
+            onPress={onSubmit}
+            style={{ marginLeft: 8 }}
+          >
+            Lưu
+          </Button>
+        </Card.Actions>
+      </Card>
 
       <Modal visible={selector.visible} animationType="slide" transparent onRequestClose={closeSelector}>
         <View style={styles.modalBackdrop}>
@@ -640,7 +682,9 @@ export default function VerifyEditor({
 
             {selector.type === "container" ? (
               <FlatList
-                data={containerTypes}
+                data={containerTypes.filter(ct =>
+                  [1, 2, 3, 4].includes(Number(ct.containerTypeId))
+                )}
                 keyExtractor={(it, index) => String(it.containerTypeId ?? index)}
                 renderItem={({ item }) => (
                   <TouchableOpacity style={styles.modalRow} onPress={() => selectContainerTypeForDetail(selector.detailIndex, Number(item.containerTypeId))}>
@@ -699,4 +743,53 @@ const styles = StyleSheet.create({
   modalCard: { backgroundColor: "#fff", borderRadius: 12, maxHeight: "80%", overflow: "hidden", padding: 12 },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   modalRow: { paddingVertical: 12, paddingHorizontal: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  summaryCard: {
+    marginTop: 12,
+    borderRadius: 12,
+    backgroundColor: "#fafafa",
+  },
+
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+
+  label: {
+    color: "#666",
+  },
+
+  value: {
+    fontWeight: "700",
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: "#e0e0e0",
+    marginVertical: 8,
+  },
+
+  finalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
+
+  finalLabel: {
+    fontSize: 15,
+    fontWeight: "800",
+  },
+
+  finalValue: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#108a3f",
+  },
+
+  actions: {
+    justifyContent: "flex-end",
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
 });

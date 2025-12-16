@@ -1,4 +1,4 @@
-import  { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   SafeAreaView,
@@ -9,7 +9,7 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
-  RefreshControl, 
+  RefreshControl,
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,45 +27,64 @@ const normalizeStatus = (raw) =>
   raw === null || raw === undefined ? '' : String(raw).toLowerCase().replace(/\s+/g, ' ').trim();
 
 export default function ContainersScreen({ navigation, route }) {
-  const [orders, setOrders] = useState([]); 
-  const [plannedOrders, setPlannedOrders] = useState([]); 
-  const [processingOrders, setProcessingOrders] = useState([]); 
+  const [orders, setOrders] = useState([]);
+  const [plannedOrders, setPlannedOrders] = useState([]);
+  const [processingOrders, setProcessingOrders] = useState([]);
   const [trackingStats, setTrackingStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const [refreshing, setRefreshing] = useState(false); 
+  const [refreshing, setRefreshing] = useState(false);
 
   const [activeTab, setActiveTab] = useState('waiting');
   const scrollRef = useRef(null);
   const chipLayouts = useRef({});
 
-  const { allowed: allowedStatusSet, planned: plannedStatusSet, processing: processingStatusSet, stats_chogiao, stats_danggiao, stats_dagiao } =
-    useMemo(() => {
-      const allowed = new Set();
-      const planned = new Set();
-      const processing = new Set();
-      const stats_chogiao = new Set();
-      const stats_danggiao = new Set();
-      const stats_dagiao = new Set();
+  const {
+    allowed: allowedStatusSet,
+    planned: plannedStatusSet,
+    processing: processingStatusSet,
+    stats_chogiao,
+    stats_danggiao,
+  } = useMemo(() => {
+    const allowed = new Set();
+    const planned = new Set();
+    const processing = new Set();
 
-      for (const s of ALLOWED_STATUSES_RAW) {
-        const n = normalizeStatus(s);
-        allowed.add(n);
-        allowed.add(n.replace(/\s+/g, ''));
-        if (n === 'pending' || n === 'wait pick up') {
-          planned.add(n); planned.add(n.replace(/\s+/g, ''));
-          stats_chogiao.add(n); stats_chogiao.add(n.replace(/\s+/g, ''));
-        } else if (n === 'pick up') {
-          processing.add(n); processing.add(n.replace(/\s+/g, ''));
-          stats_dagiao.add(n); stats_dagiao.add(n.replace(/\s+/g, ''));
-        } else {
-          processing.add(n); processing.add(n.replace(/\s+/g, ''));
-          stats_danggiao.add(n); stats_danggiao.add(n.replace(/\s+/g, ''));
-        }
+    const stats_chogiao = new Set();
+    const stats_danggiao = new Set();
+
+    const add = (set, v) => {
+      set.add(v);
+      set.add(v.replace(/\s+/g, ''));
+    };
+
+    for (const s of ALLOWED_STATUSES_RAW) {
+      const n = normalizeStatus(s);
+
+      add(allowed, n);
+
+      if (n === 'pending' || n === 'wait pick up') {
+        add(planned, n);
+        add(stats_chogiao, n);
+        continue;
       }
-      return { allowed, planned, processing, stats_chogiao, stats_danggiao, stats_dagiao };
-    }, []);
 
+      if (n === 'verify' || n === 'checkout' || n === 'pick up') {
+        add(processing, n);
+        add(stats_danggiao, n);
+        continue;
+      }
+
+    }
+
+    return {
+      allowed,
+      planned,
+      processing,
+      stats_chogiao,
+      stats_danggiao,
+    };
+  }, []);
   const extractEmployeeCode = (user) => {
     if (!user) return null;
     return (
@@ -248,24 +267,11 @@ export default function ContainersScreen({ navigation, route }) {
     loadFromParamsOrFetch();
   }, [loadFromParamsOrFetch]);
 
-  const fallback_count_chogiao = orders.filter(o => {
-    const n = normalizeStatus(o.status ?? o.raw?.status ?? '');
-    return stats_chogiao.has(n) || stats_chogiao.has(n.replace(/\s+/g, ''));
-  }).length;
 
-  const fallback_count_danggiao = orders.filter(o => {
-    const n = normalizeStatus(o.status ?? o.raw?.status ?? '');
-    return stats_danggiao.has(n) || stats_danggiao.has(n.replace(/\s+/g, ''));
-  }).length;
+ 
 
-  const fallback_count_dagiao = orders.filter(o => {
-    const n = normalizeStatus(o.status ?? o.raw?.status ?? '');
-    return stats_dagiao.has(n) || stats_dagiao.has(n.replace(/\s+/g, ''));
-  }).length;
-
-  const count_chogiao = (trackingStats && typeof trackingStats.chogiao === 'number') ? trackingStats.chogiao : fallback_count_chogiao;
-  const count_danggiao = (trackingStats && typeof trackingStats.danggiao === 'number') ? trackingStats.danggiao : fallback_count_danggiao;
-  const count_dagiao = (trackingStats && typeof trackingStats.dagiao === 'number') ? trackingStats.dagiao : fallback_count_dagiao;
+const count_chogiao = plannedOrders.length;
+const count_danggiao = processingOrders.length;
 
   const tabList = [
     { key: 'waiting', label: 'Chờ vận chuyển', count: count_chogiao },

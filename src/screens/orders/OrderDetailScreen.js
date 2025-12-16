@@ -19,7 +19,8 @@ import { API_BASE_URL } from '@env';
 import VerifyEditor from './components/VerifyEditor';
 import PhotoUploader from './components/PhotoUploaderExpo';
 import PaymentWebView from './components/PaymentWebView';
-
+import OrderPrintButton from './components/OrderPrintButton';
+import RentalContractButton from './components/RentalContractButton';
 const STEPS = [
   { key: 'pending', icon: 'file-document-outline', label: 'Chờ' },
   { key: 'wait pick up', icon: 'truck', label: 'Chờ lấy' },
@@ -352,7 +353,8 @@ export default function OrderDetailScreen({ route, navigation }) {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [busy, setBusy] = useState(false);
-
+  const canPrint = ['pick up', 'pickup', 'delivered', 'completed']
+    .includes(normalizeKey(order?.status));
   const [productTypesMap, setProductTypesMap] = useState({});
   const [serviceMap, setServiceMap] = useState({});
   const [containerMap, setContainerMap] = useState({});
@@ -600,98 +602,68 @@ export default function OrderDetailScreen({ route, navigation }) {
     while (q.queue.length > 0) {
       const job = q.queue.shift();
       const { orderCode, imageUrl, resolve, reject } = job;
+
       try {
-        // optimistic update (merge into local state)
+        let mergedImages = [];
+
+        // 1. Optimistic update (local state)
         setOrder(prev => {
           const cur = prev || {};
-          const curImgs = Array.isArray(cur.image) ? cur.image : Array.isArray(cur.images) ? cur.images : [];
-          if (curImgs.includes(imageUrl)) return prev;
-          return { ...cur, image: [...curImgs, imageUrl] };
+          const curImgs = Array.isArray(cur.image)
+            ? cur.image
+            : Array.isArray(cur.images)
+              ? cur.images
+              : [];
+
+          mergedImages = Array.from(new Set([...curImgs, imageUrl]));
+          return { ...cur, image: mergedImages };
         });
 
-        // fetch server order to get current images (best effort)
+        // 2. CALL PUT API 
         const token = await AsyncStorage.getItem('@auth_token');
-        let serverOrder = null;
-        try {
-          const getUrl = `${apiBase}/api/Order/${encodeURIComponent(orderCode)}`;
-          const getRes = await fetch(getUrl, {
-            method: 'GET',
-            headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          });
-          const getJson = await getRes.json().catch(() => null);
-          const payload = getJson?.data ?? getJson ?? null;
-          serverOrder = Array.isArray(payload) ? payload[0] : payload;
-        } catch (e) {
-          console.warn('Could not fetch server order before merging images', e);
+        const url = `${apiBase}/api/OrderStatus/tracking/update-image`;
+
+        const res = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            orderCode,
+            image: mergedImages,
+          }),
+        });
+
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          console.warn('update-image failed', res.status, json);
+          Alert.alert(
+            'Cập nhật ảnh thất bại',
+            json?.message ?? json?.errorMessage ?? `HTTP ${res.status}`
+          );
+          reject && reject(json);
+          continue;
         }
 
-        const existingFromServer =
-          (serverOrder && Array.isArray(serverOrder.image) && serverOrder.image) ||
-          (serverOrder && Array.isArray(serverOrder.images) && serverOrder.images) ||
-          (serverOrder && Array.isArray(serverOrder.photos) && serverOrder.photos) ||
-          [];
-
-        const existingLocal = Array.isArray(order?.image) ? order.image : Array.isArray(order?.images) ? order.images : [];
-        const combined = Array.from(new Set([...(existingFromServer || []), ...(existingLocal || []), imageUrl]));
-
-        // Try PUT with common field names; break on first success
-        const putUrl = `${apiBase}/api/Order/${encodeURIComponent(orderCode)}`;
-        const putBodies = [
-          { image: combined },
-          { images: combined },
-          { photos: combined }
-        ];
-
-        let putSuccess = false;
-        let updatedOrder = null;
-        for (const body of putBodies) {
-          try {
-            const putRes = await fetch(putUrl, {
-              method: 'PUT',
-              headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-              body: JSON.stringify(body),
-            });
-            const putJson = await putRes.json().catch(() => null);
-            if (!putRes.ok) {
-              console.warn('PUT attempt failed', putRes.status, putJson);
-              continue;
-            }
-            putSuccess = true;
-            const ret = putJson?.data ?? putJson ?? null;
-            updatedOrder = Array.isArray(ret) ? ret[0] : ret;
-            break;
-          } catch (e) {
-            console.warn('PUT attempt error', e);
-            continue;
-          }
-        }
-
-        if (!putSuccess) {
-          console.warn('All PUT attempts failed; image may not be persisted on server');
-          Alert.alert('Cập nhật ảnh thất bại', 'Không thể lưu ảnh lên server. Vui lòng thử lại.');
-        } else {
-          if (updatedOrder) {
-            setOrder(prev => ({ ...prev, ...(updatedOrder || {}) }));
-          } else {
-            // if server accepted but didn't return object, keep local merged
-            setOrder(prev => {
-              const cur = prev || {};
-              const curImgs = Array.isArray(cur.image) ? cur.image : Array.isArray(cur.images) ? cur.images : [];
-              const merged = Array.from(new Set([...(curImgs || []), imageUrl]));
-              return { ...cur, image: merged };
-            });
-          }
+        const payload = json?.data ?? json;
+        if (payload) {
+          setOrder(prev => ({ ...prev, ...payload }));
         }
 
         resolve && resolve(true);
       } catch (err) {
-        console.error('processUploadQueue job error', err);
+        console.error('processUploadQueue error', err);
         reject && reject(err);
       }
-    } // end while
+    }
 
     q.running = false;
-  }, [apiBase, order]);
+  }, [apiBase]);
+
+
 
   const queueUpdateOrderWithImage = useCallback((orderCode, imageUrl) => {
     return new Promise((resolve, reject) => {
@@ -851,12 +823,34 @@ export default function OrderDetailScreen({ route, navigation }) {
               <SummaryRow label="Mã đơn" value={G(order?.orderCode ?? order?.id)} />
               <SummaryRow label="Mã khách" value={G(order?.customerCode)} />
               <SummaryRow label="Khách hàng" value={G(order?.customerName ?? order?.customer?.name)} />
-              <SummaryRow label="Địa chỉ lấy" value={G(order?.pickup?.address ?? order?.pickupAddress ?? order?.customer?.address)} />
+              <SummaryRow label="Địa chỉ lấy" value={G(order?.address ?? order?.pickupAddress ?? order?.customer?.address)} />
               <SummaryRow label="Ghi chú" value={G(order?.note)} />
             </View>
 
             <View style={{ width: isTwoCol ? 340 : '100%' }}>
-              <Text style={ui.cardTitle}>Tóm tắt</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={ui.cardTitle}>Tóm tắt</Text>
+
+                {canPrint && (
+                  <>
+                    <OrderPrintButton
+                      order={order}
+                      details={details}
+                      totalPrice={totalPrice}
+                      formatDate={formatDate}
+                      mapStatusToVN={mapStatusToVN}
+                      lookups={lookups}
+                    />
+                    <RentalContractButton
+                      order={order}
+                      details={details}
+                      customer={order.customer}
+                      formatDate={formatDate}
+                    />
+                  </>
+
+                )}
+              </View>
               <Divider style={{ marginVertical: 10 }} />
               <OrderBadge text={mapStatusToVN(order?.status)} color="#108a3f" />
 
@@ -868,41 +862,41 @@ export default function OrderDetailScreen({ route, navigation }) {
               <SummaryRow label="Ngày đặt" value={formatDate(order?.orderDate ?? order?.depositDate)} />
 
               <View style={{ height: 8 }} />
-              
-              {normalizeKey(order?.status) === 'checkout' && (
-          <PaymentWebView
-            orderCode={order?.orderCode ?? routeOrderCode}
-            apiBase={apiBase}
-            onPaid={async () => {
-              const code = order?.orderCode ?? routeOrderCode;
-              if (!code) return;
-              const fresh = await fetchOrderSummary(code);
-              if (fresh) setOrder(prev => ({ ...prev, ...(Array.isArray(fresh) ? fresh[0] : fresh) }));
-              const freshDet = await fetchOrderDetails(code);
-              setDetails(freshDet);
-              Alert.alert('Cập nhật', 'Đã làm mới thông tin đơn hàng sau khi thanh toán.');
-            }}
-            onClose={async () => {
-              const code = order?.orderCode ?? routeOrderCode;
-              if (!code) return;
-              try {
-                const fresh = await fetchOrderSummary(code);
-                if (fresh) setOrder(prev => ({ ...prev, ...(Array.isArray(fresh) ? fresh[0] : fresh) }));
-                const freshDet = await fetchOrderDetails(code);
-                setDetails(freshDet);
-              } catch (e) {
-                console.warn('refresh onClose failed', e);
-              }
-            }}
-          />
 
-        )}
+              {normalizeKey(order?.status) === 'checkout' && (
+                <PaymentWebView
+                  orderCode={order?.orderCode ?? routeOrderCode}
+                  apiBase={apiBase}
+                  onPaid={async () => {
+                    const code = order?.orderCode ?? routeOrderCode;
+                    if (!code) return;
+                    const fresh = await fetchOrderSummary(code);
+                    if (fresh) setOrder(prev => ({ ...prev, ...(Array.isArray(fresh) ? fresh[0] : fresh) }));
+                    const freshDet = await fetchOrderDetails(code);
+                    setDetails(freshDet);
+                    Alert.alert('Cập nhật', 'Đã làm mới thông tin đơn hàng sau khi thanh toán.');
+                  }}
+                  onClose={async () => {
+                    const code = order?.orderCode ?? routeOrderCode;
+                    if (!code) return;
+                    try {
+                      const fresh = await fetchOrderSummary(code);
+                      if (fresh) setOrder(prev => ({ ...prev, ...(Array.isArray(fresh) ? fresh[0] : fresh) }));
+                      const freshDet = await fetchOrderDetails(code);
+                      setDetails(freshDet);
+                    } catch (e) {
+                      console.warn('refresh onClose failed', e);
+                    }
+                  }}
+                />
+
+              )}
             </View>
           </View>
-          
+
         </Surface>
 
-       
+
         {/* --- PHOTO UPLOADER (only when pick up OR delivered) --- */}
         {['pick up', 'pickup', 'delivered', 'deliver'].includes(normalizeKey(order?.status)) && (
           <Surface style={{ marginBottom: 12, padding: 12, borderRadius: 12, backgroundColor: '#fff' }}>

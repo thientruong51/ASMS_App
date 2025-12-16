@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   SafeAreaView,
@@ -12,7 +12,7 @@ import { Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { API_BASE_URL } from '@env';
-
+import * as Notifications from "expo-notifications";
 import {
   HomeHeader,
   KPIBoxes,
@@ -28,17 +28,30 @@ export default function HomeScreen({ navigation }) {
   const [processingOrders, setProcessingOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
+  const reloadTimerRef = useRef(null);
+  const prevOrderMapRef = useRef(new Map());
   const [statsPeriod, setStatsPeriod] = useState('week');
   const [trackingStats, setTrackingStats] = useState({ chogiao: 0, danggiao: 0, dagiao: 0 });
-
+const [deliveredCount, setDeliveredCount] = useState(0);
   const logoUrl =
     'https://res.cloudinary.com/dkfykdjlm/image/upload/v1762190192/LOGO-remove_1_1_wj05gw.png';
 
   const MAX_SECTION_HEIGHT = 420;
 
-  const ALLOWED_STATUSES_RAW = ['pending', 'wait pick up', 'verify', 'checkout', 'pick up', 'delivered'];
-  const normalizeStatus = (raw) => (raw === null || raw === undefined ? '' : String(raw).toLowerCase().replace(/\s+/g, ' ').trim());
+  const ALLOWED_STATUSES_RAW = [
+    'pending',
+    'wait pick up',
+    'verify',
+    'checkout',
+    'pick up',
+    'delivered',
+    'completed'
+  ];
+
+  const normalizeStatus = (raw) =>
+    raw == null
+      ? ''
+      : String(raw).toLowerCase().replace(/\s+/g, ' ').trim();
 
   const {
     allowed: allowedStatusSet,
@@ -46,35 +59,61 @@ export default function HomeScreen({ navigation }) {
     processing: processingStatusSet,
     stats_chogiao,
     stats_danggiao,
-    stats_dagiao
+    stats_dagiao,
   } = React.useMemo(() => {
     const allowed = new Set();
     const planned = new Set();
     const processing = new Set();
+
     const stats_chogiao = new Set();
     const stats_danggiao = new Set();
     const stats_dagiao = new Set();
 
     for (const s of ALLOWED_STATUSES_RAW) {
       const n = normalizeStatus(s);
+      const compact = n.replace(/\s+/g, '');
+
+      // allowed
       allowed.add(n);
-      allowed.add(n.replace(/\s+/g, ''));
+      allowed.add(compact);
+
+      // CHỜ GIAO
       if (n === 'pending' || n === 'wait pick up') {
-        planned.add(n); planned.add(n.replace(/\s+/g, ''));
-        stats_chogiao.add(n); stats_chogiao.add(n.replace(/\s+/g, ''));
-      } else if (n === 'pick up') {
-        processing.add(n); processing.add(n.replace(/\s+/g, ''));
-        stats_danggiao.add(n); stats_danggiao.add(n.replace(/\s+/g, ''));
-      } else if (n === 'delivered') {
-        stats_dagiao.add(n); stats_dagiao.add(n.replace(/\s+/g, ''));
-        processing.add(n); processing.add(n.replace(/\s+/g, ''));
-      } else {
-        processing.add(n); processing.add(n.replace(/\s+/g, ''));
-        stats_danggiao.add(n); stats_danggiao.add(n.replace(/\s+/g, ''));
+        planned.add(n);
+        planned.add(compact);
+        stats_chogiao.add(n);
+        stats_chogiao.add(compact);
+        continue;
       }
+
+      // ĐANG GIAO: verify / checkout / pick up
+      if (n === 'verify' || n === 'checkout' || n === 'pick up') {
+        processing.add(n);
+        processing.add(compact);
+        stats_danggiao.add(n);
+        stats_danggiao.add(compact);
+        continue;
+      }
+
+      // ĐÃ GIAO: delivered / completed
+      if (n === 'delivered' || n === 'completed') {
+        stats_dagiao.add(n);
+        stats_dagiao.add(compact);
+        continue;
+      }
+
     }
-    return { allowed, planned, processing, stats_chogiao, stats_danggiao, stats_dagiao };
+
+    return {
+      allowed,
+      planned,
+      processing,
+      stats_chogiao,
+      stats_danggiao,
+      stats_dagiao,
+    };
   }, []);
+
 
   const extractEmployeeCode = (user) => {
     if (!user) return null;
@@ -96,6 +135,51 @@ export default function HomeScreen({ navigation }) {
     (API_BASE_URL && API_BASE_URL.length)
       ? API_BASE_URL
       : 'https://asmsapi-agbeb7evgga8feda.southeastasia-01.azurewebsites.net';
+const fetchDeliveredCompletedCount = async (employeeCode) => {
+  if (!employeeCode) return 0;
+
+  const base = buildApiBase();
+  const token = await AsyncStorage.getItem('@auth_token');
+
+  const url =
+    `${base}/api/TrackingHistory?pageNumber=1&pageSize=1000&currentAssign=${encodeURIComponent(employeeCode)}`;
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!res.ok) return 0;
+
+  const json = await res.json();
+  const list = json?.data ?? [];
+
+  const mapByOrder = new Map();
+
+  for (const t of list) {
+    if (!t.orderCode) continue;
+
+    const status = normalizeStatus(t.newStatus);
+    if (status !== 'completed' && status !== 'delivered') continue;
+
+    if (!mapByOrder.has(t.orderCode)) {
+      mapByOrder.set(t.orderCode, new Set());
+    }
+    mapByOrder.get(t.orderCode).add(status);
+  }
+
+  let count = 0;
+  for (const statusSet of mapByOrder.values()) {
+    if (statusSet.has('completed')) count++;
+    else if (statusSet.has('delivered')) count++;
+  }
+
+  return count;
+};
 
   const mapOrderToCard = (o) => ({
     orderCode: o.orderCode ?? o.OrderCode ?? o.orderRef ?? '',
@@ -223,12 +307,25 @@ export default function HomeScreen({ navigation }) {
 
       let c_chogiao = 0, c_danggiao = 0, c_dagiao = 0;
       for (const { entry } of latestByOrder.values()) {
-        const s = normalizeStatus(entry.newStatus ?? entry.newstatus ?? entry.oldStatus ?? '');
+        const s = normalizeStatus(
+          entry.newStatus ?? entry.newstatus ?? entry.oldStatus ?? ''
+        );
         if (!s) continue;
-        if (stats_chogiao.has(s) || stats_chogiao.has(s.replace(/\s+/g, ''))) c_chogiao++;
-        else if (stats_dagiao.has(s) || stats_dagiao.has(s.replace(/\s+/g, ''))) c_dagiao++;
-        else c_danggiao++;
+
+        const compact = s.replace(/\s+/g, '');
+
+        if (stats_chogiao.has(s) || stats_chogiao.has(compact)) {
+          c_chogiao++;
+        }
+        else if (stats_danggiao.has(s) || stats_danggiao.has(compact)) {
+          c_danggiao++;
+        }
+        else if (stats_dagiao.has(s) || stats_dagiao.has(compact)) {
+          c_dagiao++;
+        }
+        // KHÔNG else — status không thuộc enum thì bỏ qua
       }
+
 
       setTrackingStats({ chogiao: c_chogiao, danggiao: c_danggiao, dagiao: c_dagiao });
     } catch (e) {
@@ -236,8 +333,8 @@ export default function HomeScreen({ navigation }) {
     }
   }, [stats_chogiao, stats_danggiao, stats_dagiao]);
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
+  const fetchOrders = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const token = await AsyncStorage.getItem('@auth_token');
       const userRaw = await AsyncStorage.getItem('@user');
@@ -292,6 +389,41 @@ export default function HomeScreen({ navigation }) {
       }
 
       const mappedAll = rawList.map(mapOrderToCard).filter((o) => isAllowedStatus(o.status ?? o.raw?.status ?? o.raw?.Status));
+      const currentMap = new Map(
+        mappedAll
+          .filter(o => o.orderCode || o.ref)
+          .map(o => [o.orderCode ?? o.ref, o])
+      );
+
+      const prevMap = prevOrderMapRef.current;
+
+      // tìm đơn mới
+      const newOrders = [];
+      for (const [code, order] of currentMap.entries()) {
+        if (!prevMap.has(code)) {
+          newOrders.push(order);
+        }
+      }
+
+      // ❗ tránh bắn lần load đầu
+      if (prevMap.size > 0 && newOrders.length > 0) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "Đơn hàng mới",
+            body:
+              newOrders.length === 1
+                ? `Có đơn hàng mới: ${newOrders[0].orderCode}`
+                : `Có ${newOrders.length} đơn hàng mới`,
+            sound: true,
+            data: {
+              type: "NEW_ORDER",
+            },
+          },
+          trigger: null,
+        });
+      }
+
+      prevOrderMapRef.current = currentMap;
 
       const planned = [];
       const processing = [];
@@ -306,31 +438,44 @@ export default function HomeScreen({ navigation }) {
       setPlannedOrders(planned);
       setProcessingOrders(processing);
 
+const delivered = await fetchDeliveredCompletedCount(employeeCode);
+setDeliveredCount(delivered);
+
       await fetchTrackingStats(employeeCode, statsPeriod);
     } catch (e) {
       console.error('fetchOrders error', e);
       Alert.alert('Lỗi', 'Không thể tải đơn hàng. Kiểm tra kết nối.');
-      setOrders([]); setPlannedOrders([]); setProcessingOrders([]); 
+      setOrders([]); setPlannedOrders([]); setProcessingOrders([]);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  setLoading(false);       
+  setRefreshing(false);
+}
   }, [fetchTrackingStats, statsPeriod]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchOrders();
+    fetchOrders({ silent: false });
   };
 
+
+
   useFocusEffect(
-    React.useCallback(() => {
-      fetchOrders();
+    useCallback(() => {
+      fetchOrders({ silent: false });
+
+      reloadTimerRef.current = setInterval(() => {
+        fetchOrders({ silent: true });
+      }, 5000);
+
+      return () => {
+        if (reloadTimerRef.current) {
+          clearInterval(reloadTimerRef.current);
+          reloadTimerRef.current = null;
+        }
+      };
     }, [fetchOrders])
   );
 
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
 
   const fallback_count_chogiao = orders.filter(o => {
     const n = normalizeStatus(o.status ?? o.raw?.status ?? '');
@@ -347,14 +492,16 @@ export default function HomeScreen({ navigation }) {
     return stats_dagiao.has(n) || stats_dagiao.has(n.replace(/\s+/g, ''));
   }).length;
 
-  const count_chogiao = (trackingStats && typeof trackingStats.chogiao === 'number') ? trackingStats.chogiao : fallback_count_chogiao;
-  const count_danggiao = (trackingStats && typeof trackingStats.danggiao === 'number') ? trackingStats.danggiao : fallback_count_danggiao;
-  const count_dagiao = (trackingStats && typeof trackingStats.dagiao === 'number') ? trackingStats.dagiao : fallback_count_dagiao;
+  const count_chogiao = plannedOrders.length;
+  const count_danggiao = processingOrders.length;
+  const count_dagiao = orders.filter(o =>
+    stats_dagiao.has(normalizeStatus(o.status))
+  ).length;
 
   const kpiItems = [
     { value: count_chogiao, label: 'Chờ giao', color: '#f4a300' },
     { value: count_danggiao, label: 'Đang giao', color: '#0aa' },
-    { value: count_dagiao, label: 'Đã giao', color: '#0a0' },
+    { value: deliveredCount, label: 'Đã giao', color: '#0a0' },
   ];
 
   const onStartTransport = (item) => {
@@ -392,7 +539,7 @@ export default function HomeScreen({ navigation }) {
                 const userRaw = await AsyncStorage.getItem('@user');
                 let emp = null;
                 if (userRaw) {
-                  try { emp = extractEmployeeCode(JSON.parse(userRaw)); } catch (_) {}
+                  try { emp = extractEmployeeCode(JSON.parse(userRaw)); } catch (_) { }
                 }
                 if (!emp) {
                   const emp2 = await AsyncStorage.getItem('@employeeCode');
@@ -405,7 +552,7 @@ export default function HomeScreen({ navigation }) {
 
           <StatRow iconUri={'https://res.cloudinary.com/dkfykdjlm/image/upload/v1763999451/27483185-f093-414f-9b64-ba6bb1d8dbe4.png'} iconBg="#fff2d9" title="Chờ giao" value={{ text: String(count_chogiao), color: '#f4a300' }} />
           <StatRow iconUri={'https://res.cloudinary.com/dkfykdjlm/image/upload/v1763999485/2a6d7fbb-23eb-4495-9b41-44a7153881be.png'} iconBg="#e8f8ff" title="Đang giao" value={{ text: String(count_danggiao), color: '#0aa' }} />
-          <StatRow iconUri={'https://res.cloudinary.com/dkfykdjlm/image/upload/v1763999506/34ac5bcb-6099-4760-a9f8-81b31dc44218.png'} iconBg="#eafbe9" title="Đã giao" value={{ text: String(count_dagiao), color: '#0a0' }} />
+          <StatRow iconUri={'https://res.cloudinary.com/dkfykdjlm/image/upload/v1763999506/34ac5bcb-6099-4760-a9f8-81b31dc44218.png'} iconBg="#eafbe9" title="Đã giao" value={{ text: String(deliveredCount), color: '#0a0' }} />
 
           {/* Processing block: horizontal scroll */}
           <View style={{ marginTop: 12 }}>
