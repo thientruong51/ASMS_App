@@ -32,7 +32,7 @@ export default function HomeScreen({ navigation }) {
   const prevOrderMapRef = useRef(new Map());
   const [statsPeriod, setStatsPeriod] = useState('week');
   const [trackingStats, setTrackingStats] = useState({ chogiao: 0, danggiao: 0, dagiao: 0 });
-
+const [deliveredCount, setDeliveredCount] = useState(0);
   const logoUrl =
     'https://res.cloudinary.com/dkfykdjlm/image/upload/v1762190192/LOGO-remove_1_1_wj05gw.png';
 
@@ -135,6 +135,51 @@ export default function HomeScreen({ navigation }) {
     (API_BASE_URL && API_BASE_URL.length)
       ? API_BASE_URL
       : 'https://asmsapi-agbeb7evgga8feda.southeastasia-01.azurewebsites.net';
+const fetchDeliveredCompletedCount = async (employeeCode) => {
+  if (!employeeCode) return 0;
+
+  const base = buildApiBase();
+  const token = await AsyncStorage.getItem('@auth_token');
+
+  const url =
+    `${base}/api/TrackingHistory?pageNumber=1&pageSize=1000&currentAssign=${encodeURIComponent(employeeCode)}`;
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!res.ok) return 0;
+
+  const json = await res.json();
+  const list = json?.data ?? [];
+
+  const mapByOrder = new Map();
+
+  for (const t of list) {
+    if (!t.orderCode) continue;
+
+    const status = normalizeStatus(t.newStatus);
+    if (status !== 'completed' && status !== 'delivered') continue;
+
+    if (!mapByOrder.has(t.orderCode)) {
+      mapByOrder.set(t.orderCode, new Set());
+    }
+    mapByOrder.get(t.orderCode).add(status);
+  }
+
+  let count = 0;
+  for (const statusSet of mapByOrder.values()) {
+    if (statusSet.has('completed')) count++;
+    else if (statusSet.has('delivered')) count++;
+  }
+
+  return count;
+};
 
   const mapOrderToCard = (o) => ({
     orderCode: o.orderCode ?? o.OrderCode ?? o.orderRef ?? '',
@@ -393,6 +438,9 @@ export default function HomeScreen({ navigation }) {
       setPlannedOrders(planned);
       setProcessingOrders(processing);
 
+const delivered = await fetchDeliveredCompletedCount(employeeCode);
+setDeliveredCount(delivered);
+
       await fetchTrackingStats(employeeCode, statsPeriod);
     } catch (e) {
       console.error('fetchOrders error', e);
@@ -453,7 +501,7 @@ export default function HomeScreen({ navigation }) {
   const kpiItems = [
     { value: count_chogiao, label: 'Chờ giao', color: '#f4a300' },
     { value: count_danggiao, label: 'Đang giao', color: '#0aa' },
-    { value: count_dagiao, label: 'Đã giao', color: '#0a0' },
+    { value: deliveredCount, label: 'Đã giao', color: '#0a0' },
   ];
 
   const onStartTransport = (item) => {
@@ -504,7 +552,7 @@ export default function HomeScreen({ navigation }) {
 
           <StatRow iconUri={'https://res.cloudinary.com/dkfykdjlm/image/upload/v1763999451/27483185-f093-414f-9b64-ba6bb1d8dbe4.png'} iconBg="#fff2d9" title="Chờ giao" value={{ text: String(count_chogiao), color: '#f4a300' }} />
           <StatRow iconUri={'https://res.cloudinary.com/dkfykdjlm/image/upload/v1763999485/2a6d7fbb-23eb-4495-9b41-44a7153881be.png'} iconBg="#e8f8ff" title="Đang giao" value={{ text: String(count_danggiao), color: '#0aa' }} />
-          <StatRow iconUri={'https://res.cloudinary.com/dkfykdjlm/image/upload/v1763999506/34ac5bcb-6099-4760-a9f8-81b31dc44218.png'} iconBg="#eafbe9" title="Đã giao" value={{ text: String(count_dagiao), color: '#0a0' }} />
+          <StatRow iconUri={'https://res.cloudinary.com/dkfykdjlm/image/upload/v1763999506/34ac5bcb-6099-4760-a9f8-81b31dc44218.png'} iconBg="#eafbe9" title="Đã giao" value={{ text: String(deliveredCount), color: '#0a0' }} />
 
           {/* Processing block: horizontal scroll */}
           <View style={{ marginTop: 12 }}>

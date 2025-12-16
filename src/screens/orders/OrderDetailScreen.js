@@ -19,7 +19,8 @@ import { API_BASE_URL } from '@env';
 import VerifyEditor from './components/VerifyEditor';
 import PhotoUploader from './components/PhotoUploaderExpo';
 import PaymentWebView from './components/PaymentWebView';
-
+import OrderPrintButton from './components/OrderPrintButton';
+import RentalContractButton from './components/RentalContractButton';
 const STEPS = [
   { key: 'pending', icon: 'file-document-outline', label: 'Chờ' },
   { key: 'wait pick up', icon: 'truck', label: 'Chờ lấy' },
@@ -352,7 +353,8 @@ export default function OrderDetailScreen({ route, navigation }) {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [busy, setBusy] = useState(false);
-
+  const canPrint = ['pick up', 'pickup', 'delivered', 'completed']
+    .includes(normalizeKey(order?.status));
   const [productTypesMap, setProductTypesMap] = useState({});
   const [serviceMap, setServiceMap] = useState({});
   const [containerMap, setContainerMap] = useState({});
@@ -592,74 +594,74 @@ export default function OrderDetailScreen({ route, navigation }) {
   /* ---------- NEW: queue-safe image appender ---------- */
   const uploadQueueRef = useRef({ queue: [], running: false });
 
- const processUploadQueue = useCallback(async () => {
-  const q = uploadQueueRef.current;
-  if (q.running) return;
-  q.running = true;
+  const processUploadQueue = useCallback(async () => {
+    const q = uploadQueueRef.current;
+    if (q.running) return;
+    q.running = true;
 
-  while (q.queue.length > 0) {
-    const job = q.queue.shift();
-    const { orderCode, imageUrl, resolve, reject } = job;
+    while (q.queue.length > 0) {
+      const job = q.queue.shift();
+      const { orderCode, imageUrl, resolve, reject } = job;
 
-    try {
-      let mergedImages = [];
+      try {
+        let mergedImages = [];
 
-      // 1. Optimistic update (local state)
-      setOrder(prev => {
-        const cur = prev || {};
-        const curImgs = Array.isArray(cur.image)
-          ? cur.image
-          : Array.isArray(cur.images)
-          ? cur.images
-          : [];
+        // 1. Optimistic update (local state)
+        setOrder(prev => {
+          const cur = prev || {};
+          const curImgs = Array.isArray(cur.image)
+            ? cur.image
+            : Array.isArray(cur.images)
+              ? cur.images
+              : [];
 
-        mergedImages = Array.from(new Set([...curImgs, imageUrl]));
-        return { ...cur, image: mergedImages };
-      });
+          mergedImages = Array.from(new Set([...curImgs, imageUrl]));
+          return { ...cur, image: mergedImages };
+        });
 
-      // 2. CALL PUT API (đúng theo Swagger)
-      const token = await AsyncStorage.getItem('@auth_token');
-      const url = `${apiBase}/api/OrderStatus/tracking/update-image`;
+        // 2. CALL PUT API 
+        const token = await AsyncStorage.getItem('@auth_token');
+        const url = `${apiBase}/api/OrderStatus/tracking/update-image`;
 
-      const res = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          orderCode,
-          image: mergedImages,
-        }),
-      });
+        const res = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            orderCode,
+            image: mergedImages,
+          }),
+        });
 
-      const json = await res.json().catch(() => null);
+        const json = await res.json().catch(() => null);
 
-      if (!res.ok) {
-        console.warn('update-image failed', res.status, json);
-        Alert.alert(
-          'Cập nhật ảnh thất bại',
-          json?.message ?? json?.errorMessage ?? `HTTP ${res.status}`
-        );
-        reject && reject(json);
-        continue;
+        if (!res.ok) {
+          console.warn('update-image failed', res.status, json);
+          Alert.alert(
+            'Cập nhật ảnh thất bại',
+            json?.message ?? json?.errorMessage ?? `HTTP ${res.status}`
+          );
+          reject && reject(json);
+          continue;
+        }
+
+        const payload = json?.data ?? json;
+        if (payload) {
+          setOrder(prev => ({ ...prev, ...payload }));
+        }
+
+        resolve && resolve(true);
+      } catch (err) {
+        console.error('processUploadQueue error', err);
+        reject && reject(err);
       }
-
-      const payload = json?.data ?? json;
-      if (payload) {
-        setOrder(prev => ({ ...prev, ...payload }));
-      }
-
-      resolve && resolve(true);
-    } catch (err) {
-      console.error('processUploadQueue error', err);
-      reject && reject(err);
     }
-  }
 
-  q.running = false;
-}, [apiBase]);
+    q.running = false;
+  }, [apiBase]);
 
 
 
@@ -826,7 +828,29 @@ export default function OrderDetailScreen({ route, navigation }) {
             </View>
 
             <View style={{ width: isTwoCol ? 340 : '100%' }}>
-              <Text style={ui.cardTitle}>Tóm tắt</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={ui.cardTitle}>Tóm tắt</Text>
+
+                {canPrint && (
+                  <>
+                    <OrderPrintButton
+                      order={order}
+                      details={details}
+                      totalPrice={totalPrice}
+                      formatDate={formatDate}
+                      mapStatusToVN={mapStatusToVN}
+                      lookups={lookups}
+                    />
+                    <RentalContractButton
+                      order={order}
+                      details={details}
+                      customer={order.customer}
+                      formatDate={formatDate}
+                    />
+                  </>
+
+                )}
+              </View>
               <Divider style={{ marginVertical: 10 }} />
               <OrderBadge text={mapStatusToVN(order?.status)} color="#108a3f" />
 
@@ -838,41 +862,41 @@ export default function OrderDetailScreen({ route, navigation }) {
               <SummaryRow label="Ngày đặt" value={formatDate(order?.orderDate ?? order?.depositDate)} />
 
               <View style={{ height: 8 }} />
-              
-              {normalizeKey(order?.status) === 'checkout' && (
-          <PaymentWebView
-            orderCode={order?.orderCode ?? routeOrderCode}
-            apiBase={apiBase}
-            onPaid={async () => {
-              const code = order?.orderCode ?? routeOrderCode;
-              if (!code) return;
-              const fresh = await fetchOrderSummary(code);
-              if (fresh) setOrder(prev => ({ ...prev, ...(Array.isArray(fresh) ? fresh[0] : fresh) }));
-              const freshDet = await fetchOrderDetails(code);
-              setDetails(freshDet);
-              Alert.alert('Cập nhật', 'Đã làm mới thông tin đơn hàng sau khi thanh toán.');
-            }}
-            onClose={async () => {
-              const code = order?.orderCode ?? routeOrderCode;
-              if (!code) return;
-              try {
-                const fresh = await fetchOrderSummary(code);
-                if (fresh) setOrder(prev => ({ ...prev, ...(Array.isArray(fresh) ? fresh[0] : fresh) }));
-                const freshDet = await fetchOrderDetails(code);
-                setDetails(freshDet);
-              } catch (e) {
-                console.warn('refresh onClose failed', e);
-              }
-            }}
-          />
 
-        )}
+              {normalizeKey(order?.status) === 'checkout' && (
+                <PaymentWebView
+                  orderCode={order?.orderCode ?? routeOrderCode}
+                  apiBase={apiBase}
+                  onPaid={async () => {
+                    const code = order?.orderCode ?? routeOrderCode;
+                    if (!code) return;
+                    const fresh = await fetchOrderSummary(code);
+                    if (fresh) setOrder(prev => ({ ...prev, ...(Array.isArray(fresh) ? fresh[0] : fresh) }));
+                    const freshDet = await fetchOrderDetails(code);
+                    setDetails(freshDet);
+                    Alert.alert('Cập nhật', 'Đã làm mới thông tin đơn hàng sau khi thanh toán.');
+                  }}
+                  onClose={async () => {
+                    const code = order?.orderCode ?? routeOrderCode;
+                    if (!code) return;
+                    try {
+                      const fresh = await fetchOrderSummary(code);
+                      if (fresh) setOrder(prev => ({ ...prev, ...(Array.isArray(fresh) ? fresh[0] : fresh) }));
+                      const freshDet = await fetchOrderDetails(code);
+                      setDetails(freshDet);
+                    } catch (e) {
+                      console.warn('refresh onClose failed', e);
+                    }
+                  }}
+                />
+
+              )}
             </View>
           </View>
-          
+
         </Surface>
 
-       
+
         {/* --- PHOTO UPLOADER (only when pick up OR delivered) --- */}
         {['pick up', 'pickup', 'delivered', 'deliver'].includes(normalizeKey(order?.status)) && (
           <Surface style={{ marginBottom: 12, padding: 12, borderRadius: 12, backgroundColor: '#fff' }}>

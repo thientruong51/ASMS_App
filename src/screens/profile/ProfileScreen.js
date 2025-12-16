@@ -252,7 +252,7 @@ export default function ProfileScreen() {
 
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Vai trò</Text>
-                <Text style={styles.infoValue}>{profile.employeeRoleId ?? profile.role ?? '-'}</Text>
+                <Text style={styles.infoValue}>Nhân viên giao hàng</Text>
               </View>
 
               <View style={styles.infoRow}>
@@ -272,7 +272,7 @@ export default function ProfileScreen() {
 
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Trạng thái</Text>
-                <Text style={styles.infoValue}>{profile.status ?? (profile.isActive ? 'Active' : 'Inactive')}</Text>
+                <Text style={styles.infoValue}>Hoạt động</Text>
               </View>
 
               <View style={{ height: 18 }} />
