@@ -592,106 +592,76 @@ export default function OrderDetailScreen({ route, navigation }) {
   /* ---------- NEW: queue-safe image appender ---------- */
   const uploadQueueRef = useRef({ queue: [], running: false });
 
-  const processUploadQueue = useCallback(async () => {
-    const q = uploadQueueRef.current;
-    if (q.running) return;
-    q.running = true;
+ const processUploadQueue = useCallback(async () => {
+  const q = uploadQueueRef.current;
+  if (q.running) return;
+  q.running = true;
 
-    while (q.queue.length > 0) {
-      const job = q.queue.shift();
-      const { orderCode, imageUrl, resolve, reject } = job;
-      try {
-        // optimistic update (merge into local state)
-        setOrder(prev => {
-          const cur = prev || {};
-          const curImgs = Array.isArray(cur.image) ? cur.image : Array.isArray(cur.images) ? cur.images : [];
-          if (curImgs.includes(imageUrl)) return prev;
-          return { ...cur, image: [...curImgs, imageUrl] };
-        });
+  while (q.queue.length > 0) {
+    const job = q.queue.shift();
+    const { orderCode, imageUrl, resolve, reject } = job;
 
-        // fetch server order to get current images (best effort)
-        const token = await AsyncStorage.getItem('@auth_token');
-        let serverOrder = null;
-        try {
-          const getUrl = `${apiBase}/api/Order/${encodeURIComponent(orderCode)}`;
-          const getRes = await fetch(getUrl, {
-            method: 'GET',
-            headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          });
-          const getJson = await getRes.json().catch(() => null);
-          const payload = getJson?.data ?? getJson ?? null;
-          serverOrder = Array.isArray(payload) ? payload[0] : payload;
-        } catch (e) {
-          console.warn('Could not fetch server order before merging images', e);
-        }
+    try {
+      let mergedImages = [];
 
-        const existingFromServer =
-          (serverOrder && Array.isArray(serverOrder.image) && serverOrder.image) ||
-          (serverOrder && Array.isArray(serverOrder.images) && serverOrder.images) ||
-          (serverOrder && Array.isArray(serverOrder.photos) && serverOrder.photos) ||
-          [];
+      // 1. Optimistic update (local state)
+      setOrder(prev => {
+        const cur = prev || {};
+        const curImgs = Array.isArray(cur.image)
+          ? cur.image
+          : Array.isArray(cur.images)
+          ? cur.images
+          : [];
 
-        const existingLocal = Array.isArray(order?.image) ? order.image : Array.isArray(order?.images) ? order.images : [];
-        const combined = Array.from(new Set([...(existingFromServer || []), ...(existingLocal || []), imageUrl]));
+        mergedImages = Array.from(new Set([...curImgs, imageUrl]));
+        return { ...cur, image: mergedImages };
+      });
 
-        // Try PUT with common field names; break on first success
-        const putUrl = `${apiBase}/api/Order/${encodeURIComponent(orderCode)}`;
-        const putBodies = [
-          { image: combined },
-          { images: combined },
-          { photos: combined }
-        ];
+      // 2. CALL PUT API (đúng theo Swagger)
+      const token = await AsyncStorage.getItem('@auth_token');
+      const url = `${apiBase}/api/OrderStatus/tracking/update-image`;
 
-        let putSuccess = false;
-        let updatedOrder = null;
-        for (const body of putBodies) {
-          try {
-            const putRes = await fetch(putUrl, {
-              method: 'PUT',
-              headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-              body: JSON.stringify(body),
-            });
-            const putJson = await putRes.json().catch(() => null);
-            if (!putRes.ok) {
-              console.warn('PUT attempt failed', putRes.status, putJson);
-              continue;
-            }
-            putSuccess = true;
-            const ret = putJson?.data ?? putJson ?? null;
-            updatedOrder = Array.isArray(ret) ? ret[0] : ret;
-            break;
-          } catch (e) {
-            console.warn('PUT attempt error', e);
-            continue;
-          }
-        }
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          orderCode,
+          image: mergedImages,
+        }),
+      });
 
-        if (!putSuccess) {
-          console.warn('All PUT attempts failed; image may not be persisted on server');
-          Alert.alert('Cập nhật ảnh thất bại', 'Không thể lưu ảnh lên server. Vui lòng thử lại.');
-        } else {
-          if (updatedOrder) {
-            setOrder(prev => ({ ...prev, ...(updatedOrder || {}) }));
-          } else {
-            // if server accepted but didn't return object, keep local merged
-            setOrder(prev => {
-              const cur = prev || {};
-              const curImgs = Array.isArray(cur.image) ? cur.image : Array.isArray(cur.images) ? cur.images : [];
-              const merged = Array.from(new Set([...(curImgs || []), imageUrl]));
-              return { ...cur, image: merged };
-            });
-          }
-        }
+      const json = await res.json().catch(() => null);
 
-        resolve && resolve(true);
-      } catch (err) {
-        console.error('processUploadQueue job error', err);
-        reject && reject(err);
+      if (!res.ok) {
+        console.warn('update-image failed', res.status, json);
+        Alert.alert(
+          'Cập nhật ảnh thất bại',
+          json?.message ?? json?.errorMessage ?? `HTTP ${res.status}`
+        );
+        reject && reject(json);
+        continue;
       }
-    } // end while
 
-    q.running = false;
-  }, [apiBase, order]);
+      const payload = json?.data ?? json;
+      if (payload) {
+        setOrder(prev => ({ ...prev, ...payload }));
+      }
+
+      resolve && resolve(true);
+    } catch (err) {
+      console.error('processUploadQueue error', err);
+      reject && reject(err);
+    }
+  }
+
+  q.running = false;
+}, [apiBase]);
+
+
 
   const queueUpdateOrderWithImage = useCallback((orderCode, imageUrl) => {
     return new Promise((resolve, reject) => {
@@ -851,7 +821,7 @@ export default function OrderDetailScreen({ route, navigation }) {
               <SummaryRow label="Mã đơn" value={G(order?.orderCode ?? order?.id)} />
               <SummaryRow label="Mã khách" value={G(order?.customerCode)} />
               <SummaryRow label="Khách hàng" value={G(order?.customerName ?? order?.customer?.name)} />
-              <SummaryRow label="Địa chỉ lấy" value={G(order?.pickup?.address ?? order?.pickupAddress ?? order?.customer?.address)} />
+              <SummaryRow label="Địa chỉ lấy" value={G(order?.address ?? order?.pickupAddress ?? order?.customer?.address)} />
               <SummaryRow label="Ghi chú" value={G(order?.note)} />
             </View>
 

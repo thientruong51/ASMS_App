@@ -10,55 +10,28 @@ import {
   SafeAreaView,
   Platform,
 } from 'react-native';
-import { TextInput, Button, Surface, Text, Switch, IconButton } from 'react-native-paper';
+import {
+  TextInput,
+  Button,
+  Surface,
+  Text,
+  Switch,
+} from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '@env';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
-
-function b64UrlDecode(input) {
-  if (!input) return null;
-  let s = input.replace(/-/g, '+').replace(/_/g, '/');
-  while (s.length % 4) s += '=';
-  try {
-    if (typeof atob === 'function') {
-      return decodeURIComponent(escape(atob(s)));
-    }
-    const decoded = typeof Buffer !== 'undefined' ? Buffer.from(s, 'base64').toString('utf8') : null;
-    if (decoded) return decoded;
-    return decodeURIComponent(escape(global?.atob ? global.atob(s) : ''));
-  } catch (e) {
-    try {
-      const bin = typeof Buffer !== 'undefined' ? Buffer.from(s, 'base64').toString('binary') : '';
-      let out = '';
-      for (let i = 0; i < bin.length; i++) {
-        const c = bin.charCodeAt(i).toString(16).padStart(2, '0');
-        out += '%' + c;
-      }
-      return decodeURIComponent(out);
-    } catch (_) {
-      return null;
-    }
-  }
-}
-
-function decodeJwtPayload(token) {
-  if (!token) return null;
-  try {
-    const parts = token.split('.');
-    if (parts.length < 2) return null;
-    const payload = b64UrlDecode(parts[1]);
-    return payload ? JSON.parse(payload) : null;
-  } catch (e) {
-    return null;
-  }
-}
-
+/* =======================
+   Helpers (GIỮ NGUYÊN)
+======================= */
 function safeNum(v) {
   const n = Number(v);
   return Number.isNaN(n) ? 0 : n;
 }
 
+/* =======================
+   Screen
+======================= */
 export default function EditProfileScreen() {
   const navigation = useNavigation();
   const route = useRoute();
@@ -66,23 +39,38 @@ export default function EditProfileScreen() {
   const initialData = route.params?.initialData ?? {};
   const employeeIdParam = route.params?.employeeId ?? null;
 
-  const apiBase = API_BASE_URL && API_BASE_URL.length ? API_BASE_URL : 'https://asmsapi-agbeb7evgga8feda.southeastasia-01.azurewebsites.net';
+  const apiBase =
+    API_BASE_URL && API_BASE_URL.length
+      ? API_BASE_URL
+      : 'https://asmsapi-agbeb7evgga8feda.southeastasia-01.azurewebsites.net';
 
   const [submitting, setSubmitting] = useState(false);
   const [token, setToken] = useState(null);
 
-  const defaultState = useMemo(() => ({
-    employeeCode: initialData.employeeCode ?? '',
-    name: initialData.name ?? '',
-    phone: initialData.phone ?? '',
-    address: initialData.address ?? '',
-    username: initialData.username ?? '',
-    status: initialData.status ?? '',
-    isActive: typeof initialData.isActive === 'boolean' ? initialData.isActive : (initialData.IsActive === "True" || initialData.IsActive === true),
-    buildingId: initialData.buildingId ?? 0,
-    employeeRoleId: initialData.employeeRoleId ?? initialData.EmployeeRoleId ?? 0,
-    imageUrl: 'https://res.cloudinary.com/dkfykdjlm/image/upload/v1754997985/ifktveiynvqhzab3oyyk.png' ?? initialData.imageUrl ?? initialData.avatar 
-  }), [initialData]);
+  const defaultState = useMemo(
+    () => ({
+      employeeCode: initialData.employeeCode ?? '',
+      name: initialData.name ?? '',
+      phone: initialData.phone ?? '',
+      address: initialData.address ?? '',
+      username: initialData.username ?? '',
+      status: initialData.status ?? '',
+      isActive:
+        typeof initialData.isActive === 'boolean'
+          ? initialData.isActive
+          : initialData.IsActive === true ||
+          initialData.IsActive === 'True',
+      buildingId: initialData.buildingId ?? 0,
+      employeeRoleId:
+        initialData.employeeRoleId ??
+        initialData.EmployeeRoleId ??
+        0,
+      imageUrl:
+
+        'https://res.cloudinary.com/dkfykdjlm/image/upload/v1754997985/ifktveiynvqhzab3oyyk.png',
+    }),
+    [initialData]
+  );
 
   const [form, setForm] = useState(defaultState);
   useEffect(() => setForm(defaultState), [defaultState]);
@@ -94,15 +82,16 @@ export default function EditProfileScreen() {
     })();
   }, []);
 
-  const onChange = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
+  const onChange = (key, val) =>
+    setForm((prev) => ({ ...prev, [key]: val }));
 
   const validate = () => {
     if (!form.name || form.name.trim().length < 2) {
-      Alert.alert('Lỗi', 'Tên không hợp lệ.');
+      Alert.alert('Lỗi', 'Tên không hợp lệ');
       return false;
     }
     if (!form.username || form.username.trim().length < 3) {
-      Alert.alert('Lỗi', 'Username không hợp lệ.');
+      Alert.alert('Lỗi', 'Username không hợp lệ');
       return false;
     }
     return true;
@@ -111,242 +100,198 @@ export default function EditProfileScreen() {
   const handleSave = async () => {
     if (!validate()) return;
 
-    const id = employeeIdParam ?? (await (async () => {
-      if (!token) return null;
-      try {
-        const payload = JSON.parse(
-          typeof Buffer !== 'undefined'
-            ? Buffer.from(token.split('.')[1], 'base64').toString('utf8')
-            : atob(token.split('.')[1])
-        );
-        return payload.Id ?? payload.id ?? payload.employeeId ?? payload.sub ?? null;
-      } catch (e) {
-        return null;
-      }
-    })());
-
+    const id = employeeIdParam;
     if (!id) {
-      Alert.alert('Lỗi', 'Không xác định được employee id để cập nhật.');
+      Alert.alert('Lỗi', 'Không xác định được employee id');
       return;
     }
 
     setSubmitting(true);
     try {
-      const theId = Number(id);
-      const bodyPascal = {
-        Id: theId,
+      const body = {
+        Id: Number(id),
+        id: Number(id),
         EmployeeCode: form.employeeCode || null,
-        EmployeeRoleId: safeNum(form.employeeRoleId),
-        Name: form.name,
-        BuildingId: safeNum(form.buildingId),
-        Phone: form.phone || null,
-        Address: form.address || null,
-        Username: form.username || null,
-        Status: form.status || null,
-        IsActive: !!form.isActive,
-      };
-
-      const bodyCamel = {
-        id: theId,
         employeeCode: form.employeeCode || null,
+        EmployeeRoleId: safeNum(form.employeeRoleId),
         employeeRoleId: safeNum(form.employeeRoleId),
+        Name: form.name,
         name: form.name,
+        BuildingId: safeNum(form.buildingId),
         buildingId: safeNum(form.buildingId),
+        Phone: form.phone || null,
         phone: form.phone || null,
+        Address: form.address || null,
         address: form.address || null,
+        Username: form.username || null,
         username: form.username || null,
+        Status: form.status || null,
         status: form.status || null,
+        IsActive: !!form.isActive,
         isActive: !!form.isActive,
+        ImageUrl: form.imageUrl,
+        imageUrl: form.imageUrl,
       };
 
-      const mergedBody = { ...bodyPascal, ...bodyCamel };
+      const tokenHeader =
+        token ?? (await AsyncStorage.getItem('@auth_token'));
 
-      if (form.imageUrl) {
-        mergedBody.ImageUrl = form.imageUrl;
-        mergedBody.imageUrl = form.imageUrl;
-      }
-      if (form.password && form.password.length > 0) {
-        mergedBody.Password = form.password;
-        mergedBody.password = form.password;
-      }
+      const url = `${apiBase}/api/Employee/${encodeURIComponent(
+        id
+      )}`;
 
-      const tokenHeader = token ?? await AsyncStorage.getItem('@auth_token');
-
-      // debug GET (optional)
-      try {
-        const getUrl = `${apiBase}/api/Employee/${encodeURIComponent(theId)}`;
-        const getRes = await fetch(getUrl, {
-          method: 'GET',
-          headers: {
-            Accept: 'application/json, text/plain, */*',
-            'Content-Type': 'application/json',
-            ...(tokenHeader ? { Authorization: `Bearer ${tokenHeader}` } : {}),
-          },
-        });
-        const getText = await getRes.text().catch(() => null);
-        console.log('DEBUG GET /api/Employee', getRes.status, getText && getText.slice ? getText.slice(0,1000) : getText);
-      } catch (e) {
-        console.warn('DEBUG: GET employee failed', e);
-      }
-
-      const url = `${apiBase}/api/Employee/${encodeURIComponent(theId)}`;
-      console.log('DEBUG PUT url/body', url, mergedBody);
       const res = await fetch(url, {
         method: 'PUT',
         headers: {
-          Accept: 'application/json, text/plain, */*',
+          Accept: 'application/json',
           'Content-Type': 'application/json',
-          ...(tokenHeader ? { Authorization: `Bearer ${tokenHeader}` } : {}),
+          ...(tokenHeader
+            ? { Authorization: `Bearer ${tokenHeader}` }
+            : {}),
         },
-        body: JSON.stringify(mergedBody),
+        body: JSON.stringify(body),
       });
 
-      let rawText = null;
-      try { rawText = await res.clone().text(); } catch (e) { /* ignore */ }
-      let json = null;
-      try { json = await res.clone().json(); } catch (e) { /* ignore */ }
-
-      console.log('DEBUG PUT res', res.status, json ?? (rawText ? rawText.slice(0,2000) : null));
-
       if (!res.ok) {
-        const serverMsg = (json?.message ?? json?.error ?? rawText) || `HTTP ${res.status}`;
-        const display = typeof serverMsg === 'string' ? serverMsg.slice(0,1500) : JSON.stringify(serverMsg).slice(0,1500);
-        Alert.alert('Lỗi server', `Status ${res.status}: ${display}`);
+        const txt = await res.text();
+        Alert.alert(
+          'Lỗi',
+          `Cập nhật thất bại (${res.status})\n${txt}`
+        );
         return;
       }
 
-      Alert.alert('Thành công', 'Cập nhật thông tin nhân viên thành công', [
-        { text: 'OK', onPress: () => navigation.goBack() }
+      Alert.alert('Thành công', 'Đã cập nhật hồ sơ', [
+        { text: 'OK', onPress: () => navigation.goBack() },
       ]);
-    } catch (err) {
-      console.error('update employee error', err);
-      Alert.alert('Lỗi', 'Cập nhật thất bại. Kiểm tra console/logs.\n' + (err?.message || String(err)));
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Lỗi', 'Có lỗi xảy ra');
     } finally {
       setSubmitting(false);
     }
   };
 
   const onPickAvatar = () => {
-    // placeholder: you can integrate ImagePicker here
-    Alert.alert('Avatar', 'Chức năng chọn avatar chưa được cài. Bạn có thể sử dụng react-native-image-picker.');
+    Alert.alert(
+      'Avatar'
+
+    );
   };
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        {/* Header green area */}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerDecorLeft} />
-          <View style={styles.headerDecorRight} />
-
-          <View style={styles.avatarArea}>
-            <View style={styles.avatarBorder}>
-              {form.imageUrl ? (
-                <Image source={{ uri: form.imageUrl }} style={styles.avatarImg} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarIcon}>🖼️</Text>
-                </View>
-              )}
-            </View>
-
-            <IconButton
-              icon="camera"
-              size={20}
-              style={styles.cameraBtn}
-              onPress={onPickAvatar}
-              accessibilityLabel="Chọn ảnh đại diện"
-            />
-          </View>
-
-          <Text style={styles.headerTitle}>Chỉnh sửa hồ sơ của bạn bên dưới</Text>
+          <Text style={styles.headerTitle}>Hồ sơ cá nhân</Text>
+          <Text style={styles.headerSub}>
+            Cập nhật thông tin của bạn
+          </Text>
         </View>
 
-        {/* Card with inputs */}
+        {/* Avatar */}
+        <View style={styles.avatarWrapper}>
+          <TouchableOpacity onPress={onPickAvatar}>
+            <Image
+              source={{ uri: form.imageUrl }}
+              style={styles.avatar}
+            />
+            <View style={styles.cameraBadge}>
+              <Text style={{ color: '#fff', fontSize: 12 }}>✎</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Form */}
         <Surface style={styles.card}>
+          <Text style={styles.sectionTitle}>Thông tin</Text>
+
           <TextInput
-            label="Tên người dùng"
+            label="Username"
             value={form.username}
-            onChangeText={t => onChange('username', t)}
+            onChangeText={(t) => onChange('username', t)}
             mode="outlined"
             style={styles.input}
-            left={<TextInput.Icon name="account" />}
-            placeholder="thientruong51"
           />
+
           <TextInput
-            label="Họ và Tên"
+            label="Họ và tên"
             value={form.name}
-            onChangeText={t => onChange('name', t)}
+            onChangeText={(t) => onChange('name', t)}
             mode="outlined"
             style={styles.input}
-            left={<TextInput.Icon name="account-circle" />}
-            placeholder="Diệp Nguyễn Thiên Trường"
           />
+
           <TextInput
             label="Số điện thoại"
             value={form.phone}
-            onChangeText={t => onChange('phone', t)}
+            onChangeText={(t) => onChange('phone', t)}
             keyboardType="phone-pad"
             mode="outlined"
             style={styles.input}
-            left={<TextInput.Icon name="phone" />}
-            placeholder="0912345678"
           />
-          <TextInput
-            label="Email"
-            value={form.email ?? ''}
-            onChangeText={t => onChange('email', t)}
-            keyboardType="email-address"
-            mode="outlined"
-            style={styles.input}
-            left={<TextInput.Icon name="email" />}
-          />
+
           <TextInput
             label="Địa chỉ"
             value={form.address}
-            onChangeText={t => onChange('address', t)}
+            onChangeText={(t) => onChange('address', t)}
             mode="outlined"
             style={styles.input}
-            left={<TextInput.Icon name="map-marker" />}
           />
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Active</Text>
-            <Switch value={!!form.isActive} onValueChange={v => onChange('isActive', v)} />
+
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>
+              Kích hoạt tài khoản
+            </Text>
+            <Switch
+              value={!!form.isActive}
+              onValueChange={(v) => onChange('isActive', v)}
+              color="#2ecc71"     
+            />
           </View>
+
+          <Text style={styles.sectionTitle}>Hệ thống</Text>
 
           <View style={styles.row}>
             <TextInput
-              label="BuildingId"
+              label="Building ID"
               value={String(form.buildingId ?? '')}
-              onChangeText={t => onChange('buildingId', t)}
+              onChangeText={(t) =>
+                onChange('buildingId', t)
+              }
               keyboardType="numeric"
               mode="outlined"
               style={[styles.input, { flex: 1 }]}
             />
             <View style={{ width: 12 }} />
             <TextInput
-              label="EmployeeRoleId"
+              label="Role ID"
               value={String(form.employeeRoleId ?? '')}
-              onChangeText={t => onChange('employeeRoleId', t)}
+              onChangeText={(t) =>
+                onChange('employeeRoleId', t)
+              }
               keyboardType="numeric"
               mode="outlined"
               style={[styles.input, { flex: 1 }]}
             />
           </View>
 
-          <TextInput
-            label="Avatar URL"
-            value={form.imageUrl ?? ''}
-            onChangeText={t => onChange('imageUrl', t)}
-            mode="outlined"
-            style={styles.input}
-            left={<TextInput.Icon name="image" />}
-          />
-
-          <View style={{ height: 12 }} />
-
-          <Button mode="contained" onPress={handleSave} loading={submitting} disabled={submitting} contentStyle={{ paddingVertical: 6 }}>
-            Lưu
+          <Button
+            mode="contained"
+            onPress={handleSave}
+            loading={submitting}
+            disabled={submitting}
+            style={styles.saveBtn}
+            contentStyle={{ paddingVertical: 10 }}
+            buttonColor="#2ecc71"
+            textColor="#ffffff"
+          >
+            Lưu thay đổi
           </Button>
 
           {submitting && (
@@ -356,107 +301,71 @@ export default function EditProfileScreen() {
           )}
         </Surface>
 
-        <View style={{ height: 48 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const HEADER_HEIGHT = 260;
-const AVATAR_SIZE = 120;
+/* =======================
+   Styles
+======================= */
+const AVATAR = 110;
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f2f4f6' },
+  safe: {
+    flex: 1,
+    backgroundColor: '#f3f5f7',
+  },
   container: {
-
+    paddingHorizontal: 16,
   },
   header: {
-    height: HEADER_HEIGHT,
-    marginTop: 6,
-    marginBottom: 0,
-    borderRadius: 16,
-    backgroundColor: '#2ecc71',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: 18,
-    overflow: 'hidden',
-  },
-  headerDecorLeft: {
-    position: 'absolute',
-    width: 220,
-    height: HEADER_HEIGHT,
-    left: -40,
-    top: -20,
-    backgroundColor: '#27ae60',
-    borderRadius: 200,
-    opacity: 0.14,
-  },
-  headerDecorRight: {
-    position: 'absolute',
-    width: 160,
-    height: 120,
-    right: -30,
-    top: 30,
-    backgroundColor: '#2ecc71',
-    borderRadius: 100,
-    opacity: 0.08,
-  },
-  avatarArea: {
-    marginTop: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarBorder: {
-    width: AVATAR_SIZE + 10,
-    height: AVATAR_SIZE + 10,
-    borderRadius: (AVATAR_SIZE + 10) / 2,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-  },
-  avatarImg: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: 18,
-    backgroundColor: '#eee',
-  },
-  avatarPlaceholder: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: 18,
-    backgroundColor: '#f7f9f7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarIcon: { fontSize: 36 },
-  cameraBtn: {
-    position: 'absolute',
-    marginTop: 84,
-    backgroundColor: '#fff',
-    right: (Platform.OS === 'ios' ? 0 : 0),
+    paddingTop: 20,
+    paddingBottom: 12,
   },
   headerTitle: {
-    marginTop: 12,
+    fontSize: 22,
     fontWeight: '800',
-    fontSize: 18,
-    color: '#063f10',
-    textAlign: 'center',
-    paddingHorizontal: 24,
+    color: '#111',
   },
-
+  headerSub: {
+    marginTop: 4,
+    color: '#777',
+  },
+  avatarWrapper: {
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  avatar: {
+    width: AVATAR,
+    height: AVATAR,
+    borderRadius: AVATAR / 2,
+    backgroundColor: '#ddd',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2ecc71',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   card: {
-    marginTop: -36,
     borderRadius: 16,
+    padding: 16,
     backgroundColor: '#fff',
-    padding: 18,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
+    elevation: 4,
+  },
+  sectionTitle: {
+    fontWeight: '700',
+    fontSize: 15,
+    marginBottom: 10,
+    marginTop: 6,
+    color: '#333',
   },
   input: {
     marginBottom: 10,
@@ -465,10 +374,19 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
-  rowLabel: {
-    fontWeight: '700',
-    color: '#333',
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 6,
+  },
+  switchLabel: {
+    fontWeight: '600',
+    color: '#444',
+  },
+  saveBtn: {
+    marginTop: 16,
+    borderRadius: 10,
   },
 });
