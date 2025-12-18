@@ -2,8 +2,12 @@ import React, { useState } from 'react';
 import { View, Image, Alert, StyleSheet, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET } from '@env';
-
+import Constants from "expo-constants";
+const {
+  
+  CLOUDINARY_CLOUD_NAME,
+  CLOUDINARY_UPLOAD_PRESET
+} = Constants.expoConfig.extra;
 
 export default function PhotoUploaderExpo({
   onUploaded,

@@ -12,7 +12,7 @@ import {
 import { Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { API_BASE_URL } from '@env';
+import Constants from "expo-constants";
 
 import HomeHeader from '../home/components/HomeHeader';
 import FooterNav from '../../components/FooterNav';
@@ -22,7 +22,10 @@ function normalizeStatus(raw) {
   if (raw === null || raw === undefined) return '';
   return String(raw).toLowerCase().replace(/\s+/g, ' ').trim();
 }
+const {
+  API_BASE_URL
 
+} = Constants.expoConfig.extra;
 const extractEmployeeCode = (user) => {
   if (!user) return null;
   return (

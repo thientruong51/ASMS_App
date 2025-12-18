@@ -14,14 +14,16 @@ import {
 import { Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { API_BASE_URL } from '@env';
+import Constants from "expo-constants";
 
 import HomeHeader from '../home/components/HomeHeader';
 import FooterNav from '../../components/FooterNav';
 import ContainerCard from './components/ContainerCard';
 
 const { width: WINDOW_WIDTH } = Dimensions.get('window');
-
+const {
+  API_BASE_URL,
+} = Constants.expoConfig.extra;
 const ALLOWED_STATUSES_RAW = ['pending', 'wait pick up', 'verify', 'checkout', 'pick up'];
 const normalizeStatus = (raw) =>
   raw === null || raw === undefined ? '' : String(raw).toLowerCase().replace(/\s+/g, ' ').trim();

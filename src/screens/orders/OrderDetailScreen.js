@@ -15,7 +15,7 @@ import {
 import { Text, Surface, Divider, Button, Card, Chip } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '@env';
+import Constants from "expo-constants";
 import VerifyEditor from './components/VerifyEditor';
 import PhotoUploader from './components/PhotoUploaderExpo';
 import PaymentWebView from './components/PaymentWebView';
@@ -29,7 +29,10 @@ const STEPS = [
   { key: 'pick up', icon: 'truck-fast', label: 'Đã lấy' },
   { key: 'delivered', icon: 'truck-check', label: 'Đã giao' },
 ];
-
+const {
+  API_BASE_URL,
+ 
+} = Constants.expoConfig.extra;
 const normalizeKey = (s) => {
   if (!s && s !== 0) return '';
   return String(s).toLowerCase().replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ').trim();

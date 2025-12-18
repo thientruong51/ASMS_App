@@ -3,8 +3,10 @@ import { View, StyleSheet, Alert, Image, ScrollView, KeyboardAvoidingView, Platf
 import { Text, TextInput, Button } from "react-native-paper";
 import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { API_BASE_URL } from "@env";
-
+import Constants from "expo-constants";
+const {
+  API_BASE_URL,
+} = Constants.expoConfig.extra;
 let jwtDecode;
 try {
   const _jwt = require("jwt-decode");

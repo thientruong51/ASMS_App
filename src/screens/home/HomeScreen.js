@@ -11,7 +11,7 @@ import {
 import { Text } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { API_BASE_URL } from '@env';
+import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import {
   HomeHeader,
@@ -21,7 +21,10 @@ import {
   ContainerCard,
   FooterNav,
 } from './components';
+const {
+  API_BASE_URL
 
+} = Constants.expoConfig.extra;
 export default function HomeScreen({ navigation }) {
   const [orders, setOrders] = useState([]);
   const [plannedOrders, setPlannedOrders] = useState([]);

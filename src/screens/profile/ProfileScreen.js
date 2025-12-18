@@ -14,13 +14,17 @@ import {
 } from 'react-native';
 import { Text, Button, Divider } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '@env';
+import Constants from "expo-constants";
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 
 import { HomeHeader } from '../home/components';
 import FooterNav from '../../components/FooterNav';
 
+const {
+  API_BASE_URL
+  
+} = Constants.expoConfig.extra;
 function b64UrlDecode(input) {
   if (!input) return null;
   let s = input.replace(/-/g, '+').replace(/_/g, '/');

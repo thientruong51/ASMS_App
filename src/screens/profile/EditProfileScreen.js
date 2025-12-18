@@ -18,9 +18,12 @@ import {
   Switch,
 } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '@env';
+import Constants from "expo-constants";
 import { useNavigation, useRoute } from '@react-navigation/native';
 
+const {
+  API_BASE_URL,
+} = Constants.expoConfig.extra;
 /* =======================
    Helpers (GIỮ NGUYÊN)
 ======================= */
