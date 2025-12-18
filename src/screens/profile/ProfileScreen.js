@@ -23,7 +23,7 @@ import FooterNav from '../../components/FooterNav';
 
 const {
   API_BASE_URL
-  
+
 } = Constants.expoConfig.extra;
 function b64UrlDecode(input) {
   if (!input) return null;
@@ -214,6 +214,40 @@ export default function ProfileScreen() {
 
   const HeaderComp = typeof HomeHeader === 'function' ? HomeHeader : DefaultHeader;
   const FooterComp = typeof FooterNav === 'function' ? FooterNav : DefaultFooter;
+  const handleLogout = async () => {
+    Alert.alert(
+      "Đăng xuất",
+      "Bạn có chắc chắn muốn đăng xuất không?",
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Đăng xuất",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await AsyncStorage.multiRemove([
+                "@auth_token",
+                "@refresh_token",
+                "@token_expiry",
+                "@user",
+                "@employeeCode",
+                "@employeeId",
+                "@employeeRoleId",
+                "@username",
+              ]);
+
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Welcome" }],
+              });
+            } catch (e) {
+              Alert.alert("Lỗi", "Không thể đăng xuất. Vui lòng thử lại.");
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -248,8 +282,9 @@ export default function ProfileScreen() {
           {loading ? (
             <ActivityIndicator />
           ) : profile ? (
+
             <>
-             
+
               <Divider style={{ marginVertical: 18 }} />
 
               <Text style={styles.sectionTitle}>Thông tin</Text>
@@ -281,7 +316,16 @@ export default function ProfileScreen() {
 
               <View style={{ height: 18 }} />
 
-              
+              <View style={{ marginTop: 24 }}>
+                <Button
+                  mode="outlined"
+                  onPress={handleLogout}
+                  style={{ borderColor: "#e74c3c", borderWidth: 1.5 }}
+                  labelStyle={{ color: "#e74c3c", fontWeight: "700" }}
+                >
+                  Đăng xuất
+                </Button>
+              </View>
             </>
           ) : (
             <>

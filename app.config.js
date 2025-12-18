@@ -7,6 +7,10 @@ export default {
 
     android: {
       package: "com.thientruong51.asms",
+       adaptiveIcon: {
+        foregroundImage: "./assets/logo.png",
+        backgroundColor: "#FFFFFF"
+      },
       permissions: [
         "CAMERA",
         "NOTIFICATIONS"

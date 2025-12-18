@@ -1,14 +1,39 @@
-import { View, Image, StyleSheet } from "react-native";
-import { Button } from "react-native-paper";
-import { useNavigation } from "@react-navigation/native";
+import { View, Image, StyleSheet, ActivityIndicator } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useEffect } from "react";
+import { useNavigation } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function SplashScreen() {
   const navigation = useNavigation();
 
-  const handleGetStarted = () => {
-    navigation.navigate("Welcome");
-  };
+  useEffect(() => {
+    const bootstrap = async () => {
+      try {
+        const token = await AsyncStorage.getItem("@auth_token");
+        const exp = await AsyncStorage.getItem("@token_expiry");
+
+        if (token && exp && Date.now() < Number(exp)) {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Home" }],
+          });
+        } else {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Welcome" }],
+          });
+        }
+      } catch (e) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Welcome" }],
+        });
+      }
+    };
+
+    bootstrap();
+  }, []);
 
   return (
     <LinearGradient colors={["#2B6624", "#5DFC52"]} style={styles.container}>
@@ -22,9 +47,7 @@ export default function SplashScreen() {
         />
       </View>
 
-      <Button mode="contained" onPress={handleGetStarted} style={styles.button} labelStyle={styles.buttonLabel}>
-        Get Started
-      </Button>
+      <ActivityIndicator size="large" color="white" />
     </LinearGradient>
   );
 }
@@ -34,27 +57,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
   },
   logoContainer: {
     backgroundColor: "white",
     borderRadius: 999,
     padding: 60,
-    marginBottom: 130,
+    marginBottom: 30,
   },
   logo: {
     width: 170,
     height: 170,
-  },
-  button: {
-    backgroundColor: "white",
-    borderRadius: 999,
-    paddingHorizontal: 40,
-    paddingVertical: 6,
-  },
-  buttonLabel: {
-    color: "#00B050",
-    fontWeight: "bold",
-    fontSize: 22,
   },
 });
