@@ -16,6 +16,10 @@
       "supportsTablet": true
     },
     "android": {
+      "permissions": [
+         "CAMERA",
+        "NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/LogoASMS.png",
         "backgroundColor": "#ffffff"
@@ -28,6 +32,11 @@
     },
     "plugins": [
       "expo-asset"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b1abbb70-9b36-45d3-886c-2ab5794403f1"
+      }
+    }
   }
 }

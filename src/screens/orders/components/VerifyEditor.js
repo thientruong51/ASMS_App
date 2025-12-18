@@ -683,7 +683,7 @@ export default function VerifyEditor({
             {selector.type === "container" ? (
               <FlatList
                 data={containerTypes.filter(ct =>
-                  [1, 2, 3, 4].includes(Number(ct.containerTypeId))
+                  [1, 2, 3, 4,5,6,7,8].includes(Number(ct.containerTypeId))
                 )}
                 keyExtractor={(it, index) => String(it.containerTypeId ?? index)}
                 renderItem={({ item }) => (
